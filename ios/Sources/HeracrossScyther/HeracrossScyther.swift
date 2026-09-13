@@ -2,10 +2,6 @@ import CoreLocation
 import Foundation
 import Scyther
 
-/// The variable Heracross stores a server's base URL under, since Scyther's
-/// `ServerConfiguration` has no field for it.
-private let baseUrlVariable = "baseUrl"
-
 /// The Objective-C face of Scyther that the `Heracross` Turbo Module calls.
 ///
 /// `Heracross.mm` declares a matching `@interface` by hand rather than importing
@@ -29,6 +25,13 @@ public final class HeracrossScyther: NSObject {
             guard !Scyther.isStarted else { return }
             Scyther.start(allowProductionBuilds: allowProductionBuilds)
         }
+    }
+
+    /// Calls back with whether Scyther has started. It runs after any `start`
+    /// call made before it, so it reflects that call's outcome.
+    @objc(isStarted:)
+    public static func isStarted(_ completion: @escaping @Sendable (Bool) -> Void) {
+        onMain { completion(Scyther.isStarted) }
     }
 
     /// Presents the menu from the top view controller.
@@ -55,7 +58,10 @@ public final class HeracrossScyther: NSObject {
     /// Registers a flag, listed in the menu by its key, with its remote value.
     @objc(registerFeatureFlag:defaultValue:)
     public static func registerFeatureFlag(_ key: String, defaultValue: Bool) {
-        onMain { Scyther.featureFlags.register(key, remoteValue: defaultValue) }
+        onMain {
+            Scyther.featureFlags.register(key, remoteValue: defaultValue)
+            scheduleChangeCheck()
+        }
     }
 
     /// Calls back with the flag's effective value.
@@ -67,25 +73,37 @@ public final class HeracrossScyther: NSObject {
     /// The menu's "Enable overrides" switch.
     @objc(setFeatureFlagOverridesEnabled:)
     public static func setFeatureFlagOverridesEnabled(_ enabled: Bool) {
-        onMain { Scyther.featureFlags.localOverridesEnabled = enabled }
+        onMain {
+            Scyther.featureFlags.localOverridesEnabled = enabled
+            scheduleChangeCheck()
+        }
     }
 
     /// Sets a registered flag's local override. Scyther ignores unregistered keys.
     @objc(setFeatureFlagOverride:value:)
     public static func setFeatureFlagOverride(_ key: String, value: Bool) {
-        onMain { Scyther.featureFlags.setLocalValue(value, for: key) }
+        onMain {
+            Scyther.featureFlags.setLocalValue(value, for: key)
+            scheduleChangeCheck()
+        }
     }
 
     /// Clears a flag's local override.
     @objc(clearFeatureFlagOverride:)
     public static func clearFeatureFlagOverride(_ key: String) {
-        onMain { Scyther.featureFlags.clearLocalValue(for: key) }
+        onMain {
+            Scyther.featureFlags.clearLocalValue(for: key)
+            scheduleChangeCheck()
+        }
     }
 
     /// Clears every registered flag's local override.
     @objc(resetFeatureFlagOverrides)
     public static func resetFeatureFlagOverrides() {
-        onMain { Scyther.featureFlags.clearAllLocalValues() }
+        onMain {
+            Scyther.featureFlags.clearAllLocalValues()
+            scheduleChangeCheck()
+        }
     }
 
     // MARK: - Servers
@@ -103,6 +121,7 @@ public final class HeracrossScyther: NSObject {
             if await Scyther.servers.current == nil, let first = entries.first {
                 await Scyther.servers.select(first.id)
             }
+            scheduleChangeCheck()
         }
     }
 
@@ -113,6 +132,7 @@ public final class HeracrossScyther: NSObject {
         enqueueServerWork {
             guard await Scyther.servers.all.contains(where: { $0.id == id }) else { return }
             await Scyther.servers.select(id)
+            scheduleChangeCheck()
         }
     }
 
@@ -127,9 +147,86 @@ public final class HeracrossScyther: NSObject {
                 completion(nil, "", [:])
                 return
             }
-            var variables = current.variables
-            let baseUrl = variables.removeValue(forKey: baseUrlVariable) ?? ""
-            completion(current.id, baseUrl, variables)
+            let split = ServerEntry.split(current.variables)
+            completion(current.id, split.baseUrl, split.variables)
+        }
+    }
+
+    // MARK: - Change events
+
+    /// Receives each registered flag whose effective value changes.
+    @MainActor private static var featureFlagChanged: (@Sendable (String, Bool) -> Void)?
+
+    /// Receives the newly selected server's id, base URL and variables.
+    @MainActor private static var serverChanged: (@Sendable (String, String, [String: String]) -> Void)?
+
+    @MainActor private static var flagTracker = FlagChangeTracker()
+    @MainActor private static var selectionTracker = SelectionTracker()
+    @MainActor private static var defaultsObserver: (any NSObjectProtocol)?
+    @MainActor private static var changeCheckScheduled = false
+
+    /// Sets the callbacks for flag and server changes, replacing any earlier
+    /// ones, and starts watching for changes.
+    ///
+    /// Scyther posts no change notifications, but it saves flag overrides, the
+    /// overrides switch and the selected server in `UserDefaults`. So Heracross
+    /// re-reads them whenever defaults change anywhere in the process, and after
+    /// each call here that could change them, and reports what differs from the
+    /// last read.
+    @objc(setFeatureFlagChangeHandler:serverChangeHandler:)
+    public static func setChangeHandlers(
+        featureFlag: @escaping @Sendable (String, Bool) -> Void,
+        server: @escaping @Sendable (String, String, [String: String]) -> Void
+    ) {
+        onMain {
+            featureFlagChanged = featureFlag
+            serverChanged = server
+            if defaultsObserver == nil {
+                defaultsObserver = NotificationCenter.default.addObserver(
+                    forName: UserDefaults.didChangeNotification,
+                    object: nil,
+                    queue: nil
+                ) { _ in
+                    scheduleChangeCheck()
+                }
+            }
+            scheduleChangeCheck()
+        }
+    }
+
+    /// Queues one check behind the work already on the main queue, so a burst of
+    /// defaults writes is read once.
+    private static func scheduleChangeCheck() {
+        onMain {
+            guard !changeCheckScheduled else { return }
+            changeCheckScheduled = true
+            onMain {
+                changeCheckScheduled = false
+                checkForChanges()
+            }
+        }
+    }
+
+    @MainActor private static func checkForChanges() {
+        guard featureFlagChanged != nil || serverChanged != nil else { return }
+        var flags: [String: Bool] = [:]
+        for flag in Scyther.featureFlags.all {
+            flags[flag.name] = Scyther.featureFlags.isEnabled(flag.name)
+        }
+        for change in flagTracker.update(flags) {
+            featureFlagChanged?(change.key, change.enabled)
+        }
+        // Read the selection behind any queued server work, so a `select` made
+        // before this check is already visible to it.
+        enqueueServerWork {
+            let current = await Scyther.servers.current
+            let id = current?.id
+            let variables = current?.variables ?? [:]
+            await MainActor.run {
+                guard let changed = selectionTracker.update(id) else { return }
+                let split = ServerEntry.split(variables)
+                serverChanged?(changed, split.baseUrl, split.variables)
+            }
         }
     }
 
@@ -245,24 +342,6 @@ public final class HeracrossScyther: NSObject {
                 await work()
             }
         }
-    }
-}
-
-/// A server as sent from JavaScript. A non-empty `baseUrl` is stored as the
-/// `baseUrl` variable, replacing any variable of that name.
-private struct ServerEntry: Sendable {
-    let id: String
-    let variables: [String: String]
-
-    init?(_ dictionary: [String: Any]) {
-        guard let id = dictionary["id"] as? String, !id.isEmpty else { return nil }
-        var variables = (dictionary["variables"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
-        variables.removeValue(forKey: baseUrlVariable)
-        if let baseUrl = dictionary["baseUrl"] as? String, !baseUrl.isEmpty {
-            variables[baseUrlVariable] = baseUrl
-        }
-        self.id = id
-        self.variables = variables
     }
 }
 

@@ -117,6 +117,10 @@ jobs:
         run: |
           yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
 
+      - name: Run Android unit tests
+        if: env.turbo_cache_hit != 1
+        run: yarn test:android
+
   build-ios:
     runs-on: macos-latest
 
@@ -169,3 +173,7 @@ jobs:
       - name: Build example for iOS (Release)
         if: env.turbo_cache_hit != 1
         run: yarn example build:ios:release
+
+      - name: Run iOS unit tests
+        if: env.turbo_cache_hit != 1
+        run: yarn test:ios

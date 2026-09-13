@@ -65,11 +65,20 @@ Make sure your code passes TypeScript:
 yarn typecheck
 ```
 
-Remember to add tests for your change if possible. Run the unit tests by:
+Remember to add tests for your change if possible. Run the JavaScript unit tests by:
 
 ```sh
 yarn test
 ```
+
+The native code keeps its logic, such as reading what JavaScript sends and working out change events, in small units with their own tests: `ios/Tests` in Swift and `android/src/test` in Kotlin. Run them by:
+
+```sh
+yarn test:ios
+yarn test:android
+```
+
+`yarn test:ios` uses the booted simulator, or an iPhone on the newest iOS runtime. It sets `HERACROSS_TESTS=1`, which lets `ios/Package.swift` resolve outside an app by leaving out the React Native packages and the Turbo Module target. `yarn test:android` needs `ANDROID_HOME` set, as any build of the example does.
 
 The React Native patch exists twice: `.yarn/patches/` for this repository and `patches/` for apps that use patch-package. Keep the two in step when you change it.
 
@@ -80,6 +89,7 @@ The root `package.json` contains scripts for common tasks:
 - `yarn`: set up the project by installing dependencies.
 - `yarn typecheck`: type-check the library and the example with TypeScript.
 - `yarn test`: run the unit tests with [Jest](https://jestjs.io/).
+- `yarn test:ios` and `yarn test:android`: run the Swift and Kotlin unit tests.
 - `yarn prepare`: build the library into `lib/` with react-native-builder-bob.
 - `yarn clean`: delete build output.
 - `yarn example start`: start the Metro server for the example app.
@@ -95,6 +105,6 @@ The root `package.json` contains scripts for common tasks:
 When you're sending a pull request:
 
 - Prefer small pull requests focused on one change.
-- Verify that `yarn typecheck` and `yarn test` pass, and that the example app builds on both platforms.
+- Verify that `yarn typecheck`, `yarn test`, `yarn test:ios` and `yarn test:android` pass, and that the example app builds on both platforms.
 - Review the documentation to make sure it looks good.
 - For pull requests that change the API or implementation, discuss with maintainers first by opening an issue.

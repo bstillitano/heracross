@@ -42,4 +42,6 @@ dependencies {
   // which calls OkHttp 4 internals, so align it with Scizor's OkHttp; otherwise
   // any request that carries a cookie crashes with NoClassDefFoundError.
   implementation "com.squareup.okhttp3:okhttp-urlconnection:5.4.0"
+
+  testImplementation "junit:junit:4.13.2"
 }

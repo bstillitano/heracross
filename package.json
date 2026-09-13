@@ -30,14 +30,18 @@
     "!**/.*",
     "!ios/.build",
     "!ios/.swiftpm",
-    "!ios/Package.resolved"
+    "!ios/Package.resolved",
+    "!ios/Tests",
+    "!android/src/test"
   ],
   "scripts": {
     "example": "yarn workspace heracross-example",
     "clean": "del-cli android/build ios/.build example/android/build example/android/app/build example/android/app/.cxx example/ios/build lib coverage .turbo",
     "prepare": "bob build",
     "typecheck": "tsc",
-    "test": "jest"
+    "test": "jest",
+    "test:ios": "node scripts/test-ios.js",
+    "test:android": "cd example/android && ./gradlew :heracross:testDebugUnitTest"
   },
   "keywords": [
     "react-native",

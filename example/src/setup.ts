@@ -30,6 +30,18 @@ export function setUpExample() {
 
   ExampleDemo.seedDemoData();
 
+  // ScytherExample puts these cookies in HTTPCookieStorage, which Scyther's
+  // Cookie Browser lists, and the iOS demo module does the same. Scizor's lists
+  // the cookies an app logs, as Scizor's own sample does.
+  if (Platform.OS === 'android') {
+    [
+      { name: 'session_id', value: 'abc123def456', domain: 'example.com', path: '/', secure: true, expires: '7 days' },
+      { name: 'user_prefs', value: 'theme=dark&lang=en', domain: 'example.com', path: '/', expires: '30 days' },
+      { name: '_ga', value: 'GA1.2.1234567890.1234567890', domain: 'analytics.example.com', path: '/', expires: '1 year' },
+      { name: 'auth_token', value: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9', domain: 'api.example.com', path: '/api', secure: true, expires: '1 day' },
+    ].forEach((cookie) => Heracross.cookies.log(cookie));
+  }
+
   Heracross.setEnvironmentVariables({
     API_BASE_URL: 'https://api.example.com',
     APP_ENVIRONMENT: 'development',

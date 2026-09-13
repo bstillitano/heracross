@@ -8,6 +8,7 @@ NS_ASSUME_NONNULL_BEGIN
 // enabled across React's headers. Keep in sync with HeracrossScyther.swift.
 @interface HeracrossScyther : NSObject
 + (void)startAllowingProductionBuilds:(BOOL)allowProductionBuilds;
++ (void)isStarted:(void (^)(BOOL started))completion;
 + (void)showMenu;
 + (void)hideMenu;
 + (void)setInvocationGesture:(NSString *)gesture;
@@ -22,6 +23,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)getSelectedServer:(void (^)(NSString *_Nullable serverId,
                                     NSString *baseUrl,
                                     NSDictionary<NSString *, NSString *> *variables))completion;
++ (void)setFeatureFlagChangeHandler:(void (^)(NSString *key, BOOL enabled))featureFlagHandler
+                serverChangeHandler:(void (^)(NSString *serverId,
+                                              NSString *baseUrl,
+                                              NSDictionary<NSString *, NSString *> *variables))serverHandler;
 + (void)setEnvironmentVariables:(NSDictionary<NSString *, id> *)variables;
 + (void)setDeveloperOptions:(NSArray<NSDictionary<NSString *, id> *> *)options;
 + (void)setDeepLinkPresets:(NSArray<NSDictionary<NSString *, id> *> *)presets;
@@ -38,7 +43,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 NS_ASSUME_NONNULL_END
 
-@interface Heracross : NSObject <NativeHeracrossSpec>
+@interface Heracross : NativeHeracrossSpecBase <NativeHeracrossSpec>
 @end
 
 @implementation Heracross
@@ -48,10 +53,39 @@ NS_ASSUME_NONNULL_END
   return @"Heracross";
 }
 
+// The emitters can only be called once React has handed over its callback, so
+// the change handlers are installed here rather than at init. A newer instance,
+// such as after a reload, replaces an older one's handlers.
+- (void)setEventEmitterCallback:(EventEmitterCallbackWrapper *)eventEmitterCallbackWrapper
+{
+  [super setEventEmitterCallback:eventEmitterCallbackWrapper];
+  __weak Heracross *weakSelf = self;
+  [HeracrossScyther
+      setFeatureFlagChangeHandler:^(NSString *key, BOOL enabled) {
+        [weakSelf emitOnFeatureFlagChange:@{@"key" : key, @"enabled" : @(enabled)}];
+      }
+      serverChangeHandler:^(NSString *serverId,
+                            NSString *baseUrl,
+                            NSDictionary<NSString *, NSString *> *variables) {
+        [weakSelf emitOnServerChange:@{
+          @"id" : serverId,
+          @"baseUrl" : baseUrl,
+          @"variables" : variables,
+        }];
+      }];
+}
+
 - (void)start:(BOOL)allowProductionBuilds captureNetwork:(BOOL)captureNetwork
 {
   // Scyther intercepts URLSession traffic itself; captureNetwork is Android only.
   [HeracrossScyther startAllowingProductionBuilds:allowProductionBuilds];
+}
+
+- (void)isStarted:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
+{
+  [HeracrossScyther isStarted:^(BOOL started) {
+    resolve(@(started));
+  }];
 }
 
 - (void)showMenu
@@ -67,6 +101,11 @@ NS_ASSUME_NONNULL_END
 - (void)setInvocationGesture:(NSString *)gesture
 {
   [HeracrossScyther setInvocationGesture:gesture];
+}
+
+- (void)setDisabledFeatures:(NSArray *)features
+{
+  // Scyther has no way to hide its built-in tools; this is Android only.
 }
 
 - (void)registerFeatureFlag:(NSString *)key title:(NSString *)title defaultValue:(BOOL)defaultValue
@@ -160,6 +199,21 @@ NS_ASSUME_NONNULL_END
 - (void)logNotification:(NSDictionary *)payload
 {
   [HeracrossScyther logNotification:payload];
+}
+
+// Scyther's Cookie Browser lists HTTPCookieStorage.sharedHTTPCookieStorage,
+// which React Native's networking stores its cookies in, so there is nothing to
+// log by hand on iOS.
+- (void)logCookie:(NSDictionary *)cookie
+{
+}
+
+- (void)captureWebViewCookies:(NSString *)url
+{
+}
+
+- (void)clearLoggedCookies
+{
 }
 
 - (void)triggerTestCrash

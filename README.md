@@ -48,12 +48,14 @@ Your app gets each platform's native menu, including network logs, data browsers
   - [Deep Link Presets](#deep-link-presets)
   - [Push Notifications](#push-notifications)
   - [Network Logging](#network-logging)
+  - [Cookies](#cookies)
   - [Crash Logging](#crash-logging)
   - [Location Spoofing](#location-spoofing)
   - [Going Native](#going-native)
 - [Permissions & Platform Setup](#permissions--platform-setup)
 - [Menu Invocation](#menu-invocation)
 - [Production Safety](#production-safety)
+  - [Hiding tools](#hiding-tools)
   - [What ships in a release build](#what-ships-in-a-release-build)
 - [Where Settings Live](#where-settings-live)
 - [Testing with Jest](#testing-with-jest)
@@ -107,7 +109,7 @@ Everything below lives in the native debug menu. Features marked **JS** are also
 |---|---|---|
 | Feature flags **JS** | Override registered flags at runtime | Set registered flags to True, False or Remote at runtime |
 | Preferences browser | View and edit `UserDefaults` | View and edit `SharedPreferences` |
-| Cookie browser | Inspect and delete cookies in `HTTPCookieStorage` | Cookies seen in captured traffic, logged by the app or captured from a WebView. Deleting one hides it; Clear all also wipes the WebView cookie store |
+| Cookie browser **JS** | Inspect and delete cookies in `HTTPCookieStorage`, where React Native's networking keeps its cookies | Cookies seen in captured traffic, logged by the app or captured from a WebView. Deleting one hides it; Clear all also wipes the WebView cookie store |
 | File browser | Browse Documents, Library, Caches and tmp | Browse the app's private and app-specific external storage; preview, share, open or delete files |
 | Database browser | Browse and edit SQLite databases, including Core Data and SwiftData stores, in Application Support, Documents and Library, with a SQL editor | Browse and edit SQLite databases, including Room's, in the app's databases directory, with a raw SQL editor |
 
@@ -181,7 +183,7 @@ Heracross isn't published to npm yet. Install it from GitHub, which builds the p
 npm install github:bstillitano/heracross
 ```
 
-While the repository is private, only accounts with access to it can install it.
+While the repository is private, only accounts with access to it can install it. npm records the dependency with an SSH URL in `package-lock.json`, so machines that run `npm ci`, such as CI, need SSH access to the repository too.
 
 ### Android
 
@@ -226,7 +228,7 @@ Heracross ships Swift Package Manager support only, so your app has to use React
      Then add `"postinstall": "patch-package"` to your `scripts`. The file name has to match your installed React Native version.
    - **Yarn 4:** run `yarn patch react-native`, make the same one-line change in the directory it prints, then run `yarn patch-commit -s <that directory>`.
 
-3. **Switch the app to Swift Package Manager.** Commit your work, then run:
+3. **Switch the app to Swift Package Manager.** Commit your work, including `patches/`, `react-native.config.js` and `package.json`, then run:
 
    ```sh
    npx react-native spm
@@ -234,7 +236,20 @@ Heracross ships Swift Package Manager support only, so your app has to use React
 
    On a project that isn't set up for SPM yet, this runs `add`. It converts a CocoaPods app by itself only when the Podfile lists no third-party pods, the Xcode project and Podfile are committed with no local changes, and CocoaPods is installed. Otherwise run `npx react-native spm add --deintegrate`.
 
-4. **Raise the deployment target to iOS 16**, the minimum Scyther supports: in Xcode, select your app target and set Minimum Deployments to 16.0 for every configuration.
+   Every native library in the app needs a `Package.swift`, and some don't ship one yet, including `react-native-safe-area-context` from React Native's app template. The command stops and names the library:
+
+   ```
+   error: Package.swift is missing for library "react-native-safe-area-context" — it ships no Swift Package Manager support.
+   ```
+
+   Generate a manifest for it and keep it as a patch, then commit and run `npx react-native spm` again:
+
+   ```sh
+   npx react-native spm scaffold
+   npx patch-package react-native-safe-area-context
+   ```
+
+4. **Raise the deployment target to iOS 16**, the minimum Scyther supports: in Xcode, select your app target and set Minimum Deployments to 16.0 for every configuration. That's the target's `IPHONEOS_DEPLOYMENT_TARGET` build setting, if you'd rather edit `project.pbxproj`.
 
 5. **Update the injected packages**, and do the same whenever you add or remove a native dependency:
 
@@ -243,6 +258,8 @@ Heracross ships Swift Package Manager support only, so your app has to use React
    ```
 
 6. **Build and run from Xcode**, using `ios/<YourApp>.xcodeproj`. Xcode fetches Scyther from GitHub when it resolves packages.
+
+SPM copies each library's sources into `ios/build/generated`. If `tsc` then reports errors from there, add `"ios/build"` to the `exclude` list in your `tsconfig.json`.
 
 ## Quick Start
 
@@ -260,7 +277,10 @@ Then open the menu from code, for example from a button in a debug screen:
 Heracross.showMenu();
 ```
 
-In a release build, shaking the device opens the menu too. In a debug build, React Native's Dev Menu also answers shakes: on iOS it opens instead of Heracross's menu, and on Android both can open. That's why `showMenu()` is the reliable way in development.
+In a release build, shaking the device opens the menu too. In a debug build, React Native's Dev Menu also listens for shakes:
+
+- **iOS:** the Dev Menu opens instead of Heracross's menu, so use `showMenu()` in development.
+- **Android:** Scizor's menu opens and the Dev Menu doesn't. Scizor opens a copy for every half second of shaking, so a long shake stacks several. Open the Dev Menu with `adb shell input keyevent 82` instead, or set the gesture to something other than `shake` to give shakes back to it.
 
 ## Usage Guide
 
@@ -292,7 +312,17 @@ Heracross.featureFlags.resetOverrides();              // every flag back to its 
 
 On iOS a flag must be registered before you override it. On Android, overrides need Scizor to have started, so they don't apply when its production gate refused to start.
 
-Each call is a one-off read or write: Heracross doesn't notify you when a tester changes a flag in the menu. Read the value again when you need it, for example when the app returns to the foreground.
+To react when a flag's value changes, whether a tester flips it in the menu or your code overrides it, add a listener:
+
+```ts
+const subscription = Heracross.featureFlags.addListener(({ key, enabled }) => {
+  if (key === 'new_checkout') setNewCheckout(enabled);
+});
+
+subscription.remove(); // when you're done
+```
+
+The listener gets a flag's new effective value, the same value `isEnabled` would resolve, whenever it changes: from an override, from the "Enable overrides" switch, or from registering the flag again with a different default. A flag's first registration isn't a change, so read the value with `isEnabled` first and listen for changes after that.
 
 ### Server Configuration
 
@@ -316,9 +346,18 @@ const server = await Heracross.servers.getSelected();
 - **When nothing is selected**, or the saved server is no longer configured, `getSelected()` resolves the first configured server. It resolves `null` only when no servers are configured.
 - **`configure` differs by platform:** on Android it replaces the list; on iOS it adds or replaces servers by id.
 - **`baseUrl` on iOS:** Scyther has no base URL field, so a non-empty `baseUrl` is stored, and shown in the menu, as a `baseUrl` variable. That makes `baseUrl` a reserved variable name on iOS.
-- **No change events.** Read the selection again when you need it, for example to build your API client.
 
 On Android, when Scizor's production gate refused to start, `select` does nothing and `getSelected()` always resolves the first server.
+
+To rebuild your API client when the environment changes, add a listener:
+
+```ts
+const subscription = Heracross.servers.addListener((server) => {
+  api.setBaseUrl(server.baseUrl);
+});
+```
+
+The listener gets the newly selected server, in the same shape as `getSelected()`, whenever the selection moves to a different id: from the menu, from `select`, or from `configure` when the selected server is no longer configured. The first selection isn't a change. On iOS a server picked in the menu is reported straight away. Scizor doesn't report selections, so on Android Heracross notices one when the app comes back to the foreground, which is when the menu closes.
 
 ### Environment Variables
 
@@ -379,6 +418,28 @@ Pass nothing and React Native's requests are logged:
 
 On Android, Scizor reads up to 1 MB of each response body before handing the response on, so streaming responses, such as server-sent events or download progress, arrive late while capture is on.
 
+### Cookies
+
+On iOS, Scyther's Cookie Browser lists `HTTPCookieStorage.shared`, which is where React Native's networking stores cookies, so there's nothing to do.
+
+On Android, Scizor's Cookie Browser lists cookies from the traffic it captures. Add others yourself, such as cookies your app sets by hand or a WebView's:
+
+```ts
+Heracross.cookies.log({
+  name: 'session',
+  value: token,
+  domain: 'example.com',
+  path: '/',
+  secure: true,
+  httpOnly: true,
+});
+
+Heracross.cookies.captureWebView('https://example.com'); // every WebView cookie for that URL
+Heracross.cookies.clear();                                // forget the ones you added
+```
+
+All three do nothing on iOS.
+
 ### Crash Logging
 
 Crashes are saved and listed in the menu under System Tools → Crash Logs; a crash that kills the app shows once it's relaunched. To check it end to end:
@@ -422,8 +483,6 @@ Heracross covers what both toolkits share. Everything else, such as custom scree
 implementation "com.github.bstillitano:scizor:v0.2.2"
 ```
 
-The [example app](#example-app) does this to log cookies to Scizor.
-
 ## Permissions & Platform Setup
 
 Some toolkit features need setup in your app before they work:
@@ -457,7 +516,7 @@ Heracross.hideMenu();
 
 - **Floating button:** on Android it's attached when one of your Activities resumes. When you call `start()` from JavaScript, your Activity has usually resumed already, so the button appears the next time the app comes back to the foreground or the Scizor menu closes.
 - **`showMenu()`** does nothing until `start()` has run. On iOS it also does nothing while the menu is open; on Android it opens a second copy.
-- **Shaking** in a debug build also reaches React Native's Dev Menu; see [Quick Start](#quick-start).
+- **Shaking** in a debug build competes with React Native's Dev Menu differently on each platform; see [Quick Start](#quick-start).
 
 ## Production Safety
 
@@ -473,6 +532,22 @@ Heracross.start({ allowProductionBuilds: true });
 ```
 
 **Warning:** anyone holding that build can see network traffic, preferences, cookies and keychain or keystore contents.
+
+To check at runtime whether the toolkit started, for example to hide a "Debug menu" button:
+
+```ts
+const started = await Heracross.isStarted();
+```
+
+### Hiding tools
+
+On Android you can hide Scizor's riskier tools from a build that leaves your team:
+
+```ts
+Heracross.setDisabledFeatures(['keystore', 'console', 'preferences']);
+```
+
+Each call replaces the previous list, and `[]` shows every tool again. The ids are `network`, `servers`, `environment_variables`, `feature_flags`, `preferences`, `cookies`, `file_browser`, `database_browser`, `keystore`, `location`, `console`, `deep_link`, `crash_logs`, `notification_logger`, `notification_tester`, `fonts`, `interface_previews`, `grid_overlay`, `fps_counter`, `touch_visualiser` and `appearance`. Scyther can't hide its tools, so iOS ignores the call.
 
 ### What ships in a release build
 
@@ -499,11 +574,13 @@ jest.mock('heracross', () => ({
     featureFlags: {
       register: jest.fn(),
       isEnabled: jest.fn(() => Promise.resolve(false)),
+      addListener: jest.fn(() => ({ remove: jest.fn() })),
     },
     servers: {
       configure: jest.fn(),
       select: jest.fn(),
       getSelected: jest.fn(() => Promise.resolve(null)),
+      addListener: jest.fn(() => ({ remove: jest.fn() })),
     },
   },
 }));
@@ -543,6 +620,7 @@ heracross (JavaScript API)
 - **One spec, two implementations.** `src/NativeHeracross.ts` is the Turbo Module spec. Codegen turns it into an Objective-C++ protocol and a Java base class, so both platforms implement the same surface.
 - **iOS is split across two targets.** SwiftPM can't compile Swift and Objective-C++ in one target, so the Turbo Module is Objective-C++ and every call into Scyther goes through a small Swift target. Scyther's API runs on the main actor, so each call is forwarded to the main queue in the order JavaScript made it, and server calls also go through a serial chain against Scyther's `Servers` actor.
 - **Android forwards to Scizor.** Scizor calls are posted to the main thread in order; the networking hook is installed directly in `start()`.
+- **Change events come from re-reading.** Neither toolkit reports every change, so Heracross keeps the last value of each registered flag and the selected server's id, reads them again when something may have changed, and emits the differences. On iOS that's after its own calls and whenever `UserDefaults` changes, which is where Scyther saves overrides and the selected server. On Android it's after its own calls, from Scizor's override callback, and when the app returns to the foreground. Scizor's callback is a single slot: Heracross installs its own once and still calls the one that was there before, but code that sets it later replaces Heracross's, and flag changes made in the menu are then only noticed when the menu closes.
 - **The JavaScript layer normalises input.** `src/index.tsx` fills in defaults and converts ids, names and values to strings before they reach native code.
 
 ## API Reference
@@ -550,22 +628,28 @@ heracross (JavaScript API)
 | Symbol | iOS (Scyther) | Android (Scizor) |
 |---|---|---|
 | `start({ allowProductionBuilds, captureNetwork })` | `Scyther.start(allowProductionBuilds:)`, once; `captureNetwork` is ignored | `Scizor.start(app, allowProductionBuilds)`, plus the networking hook |
+| `isStarted()` → `Promise<boolean>` | `Scyther.isStarted` | whether a `start()` call passed Scizor's production gate |
 | `showMenu()` / `hideMenu()` | `showMenu()` / `hideMenu()` | `show()` / `dismiss()` |
 | `setInvocationGesture(gesture)` | `.shake`, or `.custom` for anything else | `SHAKE` / `FLOATING_BUTTON` / `NONE` |
+| `setDisabledFeatures(ids)` | no-op | `disabledFeatures` |
 | `featureFlags.register(flags)` | `featureFlags.register(_:remoteValue:)`, listed by key | `featureFlags.register(FeatureFlag)`, listed by title |
 | `featureFlags.isEnabled(key)` → `Promise<boolean>` | `featureFlags.isEnabled(_:)` | `featureFlags.isEnabled(key)` |
 | `featureFlags.setOverridesEnabled(enabled)` | `localOverridesEnabled` | `overridesEnabled` |
 | `featureFlags.setOverride(key, value)` / `clearOverride(key)` | `setLocalValue(_:for:)` / `clearLocalValue(for:)` | `setOverride(key, ON \| OFF \| REMOTE)` |
 | `featureFlags.resetOverrides()` | `clearAllLocalValues()` | `resetAllToRemote()` |
+| `featureFlags.addListener(listener)` → `EventSubscription` | re-reads flags when `UserDefaults` changes | `featureFlags.onOverrideChanged`, and a re-read when the app resumes |
 | `servers.configure(servers)` | `servers.register(id:variables:)`, adds or replaces by id | `servers.configure(environments)`, replaces the list |
 | `servers.select(id)` | `servers.select(_:)`, for a configured id | `servers.select(environment)`, for a configured id |
 | `servers.getSelected()` → `Promise<SelectedServer \| null>` | `servers.current`, falling back to the first server | `servers.selected` |
+| `servers.addListener(listener)` → `EventSubscription` | re-reads `servers.current` when `UserDefaults` changes | re-reads `servers.selected` when the app resumes |
 | `setEnvironmentVariables(map)` | `environmentVariables` | `environmentVariables` |
 | `setDeveloperOptions(rows)` | `DeveloperOption(name:value:)` | `DeveloperOption.Value` |
 | `deepLinks.setPresets(presets)` | `deepLinks.presets` | `deepLinkPresets` |
 | `setApnsToken(token)` | `apnsToken` | no-op |
 | `setFcmToken(token)` | `fcmToken` | `fcmToken` |
 | `notifications.log(payload)` | `notifications.logNotification(_:)` | no-op |
+| `cookies.log(cookie)` | no-op | `cookies.log(...)` |
+| `cookies.captureWebView(url)` / `cookies.clear()` | no-op | `cookies.captureWebView(url)` / `cookies.clear()` |
 | `crashes.triggerTestCrash()` | `crashes.triggerTestCrash()`, Debug builds only | throws on the main thread, debuggable builds only |
 | `location.getSpoofingState()` → `Promise<LocationSpoofingState \| null>` | `location.spoofingEnabled`, `spoofedLocation`, `CLLocationManager.isLocationSwizzled` | resolves `null` |
 
@@ -585,6 +669,10 @@ All of these are exported from `heracross`:
 | `DeveloperOption` | `{ name: string; value: string }` |
 | `DeepLinkPreset` | `{ name: string; url: string }` |
 | `LocationSpoofingState` | `{ enabled: boolean; swizzled: boolean; locationName: string; latitude: number; longitude: number }` |
+| `FeatureFlagChange` | `{ key: string; enabled: boolean }` |
+| `Cookie` | `{ name: string; value: string; domain: string; path?: string; secure?: boolean; httpOnly?: boolean; sameSite?: string; expires?: string }` |
+| `ScizorFeature` | One of the ids in [Hiding tools](#hiding-tools), or any other string |
+| `EventSubscription` | React Native's `{ remove(): void }`, re-exported |
 
 ## Troubleshooting
 
@@ -594,7 +682,9 @@ All of these are exported from `heracross`:
 
 **Android crashes with `NoClassDefFoundError: Failed resolution of: Lokhttp3/internal/Util;`.** Something in your build forces `okhttp-urlconnection` back to OkHttp 4 while Scizor brings OkHttp 5. Keep `okhttp-urlconnection` at 5.4.0, as Heracross declares.
 
-**Shaking opens React Native's Dev Menu.** That's a debug build; see [Quick Start](#quick-start).
+**Shaking opens React Native's Dev Menu on iOS.** That's a debug build; use `Heracross.showMenu()`. See [Quick Start](#quick-start).
+
+**Shaking on Android opens Scizor's menu several times, or never opens React Native's Dev Menu.** Scizor takes the shake; see [Quick Start](#quick-start).
 
 **The floating button doesn't appear.** It attaches when an Activity resumes; background the app and return to it. See [Menu Invocation](#menu-invocation).
 
@@ -658,7 +748,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, how to run 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make the change, with tests and documentation
-4. Run `yarn typecheck` and `yarn test`, and build the example app on both platforms
+4. Run `yarn typecheck`, `yarn test`, `yarn test:ios` and `yarn test:android`, and build the example app on both platforms
 5. Open a Pull Request
 
 ### Reporting Issues

@@ -12,9 +12,11 @@ jest.mock('../NativeHeracross', () => {
   const mock: import('../NativeHeracross').Spec = {
     getConstants: jest.fn(() => ({})),
     start: jest.fn(),
+    isStarted: jest.fn(() => Promise.resolve(true)),
     showMenu: jest.fn(),
     hideMenu: jest.fn(),
     setInvocationGesture: jest.fn(),
+    setDisabledFeatures: jest.fn(),
     registerFeatureFlag: jest.fn(),
     isFeatureFlagEnabled: jest.fn(() => Promise.resolve(true)),
     setFeatureFlagOverridesEnabled: jest.fn(),
@@ -30,8 +32,13 @@ jest.mock('../NativeHeracross', () => {
     setApnsToken: jest.fn(),
     setFcmToken: jest.fn(),
     logNotification: jest.fn(),
+    logCookie: jest.fn(),
+    captureWebViewCookies: jest.fn(),
+    clearLoggedCookies: jest.fn(),
     triggerTestCrash: jest.fn(),
     getLocationSpoofingState: jest.fn(() => Promise.resolve(null)),
+    onFeatureFlagChange: jest.fn(() => ({ remove: jest.fn() })),
+    onServerChange: jest.fn(() => ({ remove: jest.fn() })),
   };
   return { __esModule: true, default: mock };
 });
@@ -66,6 +73,22 @@ describe('Heracross', () => {
     it('defaults the options that are left out', () => {
       Heracross.start({ captureNetwork: false });
       expect(native.start).toHaveBeenCalledWith(false, false);
+    });
+
+    it('resolves whether the toolkit started', async () => {
+      await expect(Heracross.isStarted()).resolves.toBe(true);
+      expect(native.isStarted).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('setDisabledFeatures', () => {
+    it('passes feature ids as strings', () => {
+      Heracross.setDisabledFeatures(['keystore', 'console', 5 as never]);
+      expect(native.setDisabledFeatures).toHaveBeenCalledWith([
+        'keystore',
+        'console',
+        '5',
+      ]);
     });
   });
 
@@ -148,6 +171,16 @@ describe('Heracross', () => {
       expect(native.clearFeatureFlagOverride).toHaveBeenCalledWith('a');
       expect(native.resetFeatureFlagOverrides).toHaveBeenCalledTimes(1);
     });
+
+    it('delivers flag changes to a listener and returns the subscription', () => {
+      const subscription = { remove: jest.fn() };
+      native.onFeatureFlagChange.mockReturnValueOnce(subscription);
+      const listener = jest.fn();
+      expect(Heracross.featureFlags.addListener(listener)).toBe(subscription);
+      const handler = native.onFeatureFlagChange.mock.calls[0]![0];
+      handler({ key: 'a', enabled: true });
+      expect(listener).toHaveBeenCalledWith({ key: 'a', enabled: true });
+    });
   });
 
   describe('servers', () => {
@@ -199,6 +232,66 @@ describe('Heracross', () => {
       };
       native.getSelectedServer.mockResolvedValueOnce(server);
       await expect(Heracross.servers.getSelected()).resolves.toEqual(server);
+    });
+
+    it('delivers server changes to a listener and returns the subscription', () => {
+      const subscription = { remove: jest.fn() };
+      native.onServerChange.mockReturnValueOnce(subscription);
+      const listener = jest.fn();
+      expect(Heracross.servers.addListener(listener)).toBe(subscription);
+      const handler = native.onServerChange.mock.calls[0]![0];
+      const server = {
+        id: 'Staging',
+        baseUrl: 'https://staging',
+        variables: { REGION: 'au' },
+      };
+      handler(server);
+      expect(listener).toHaveBeenCalledWith(server);
+    });
+  });
+
+  describe('cookies', () => {
+    it('fills in optional fields so native sees strings, booleans or null', () => {
+      Heracross.cookies.log({ name: 'a', value: 'b', domain: 'c' });
+      Heracross.cookies.log({
+        name: 'session',
+        value: 7 as unknown as string,
+        domain: 'example.com',
+        path: '/',
+        secure: true,
+        httpOnly: 1 as unknown as boolean,
+        sameSite: 'Lax',
+        expires: 'Wed, 21 Oct 2026 07:28:00 GMT',
+      });
+      expect(native.logCookie).toHaveBeenNthCalledWith(1, {
+        name: 'a',
+        value: 'b',
+        domain: 'c',
+        path: null,
+        secure: false,
+        httpOnly: false,
+        sameSite: null,
+        expires: null,
+      });
+      expect(native.logCookie).toHaveBeenNthCalledWith(2, {
+        name: 'session',
+        value: '7',
+        domain: 'example.com',
+        path: '/',
+        secure: true,
+        httpOnly: true,
+        sameSite: 'Lax',
+        expires: 'Wed, 21 Oct 2026 07:28:00 GMT',
+      });
+    });
+
+    it('forwards WebView capture and clearing', () => {
+      Heracross.cookies.captureWebView('https://example.com');
+      Heracross.cookies.clear();
+      expect(native.captureWebViewCookies).toHaveBeenCalledWith(
+        'https://example.com'
+      );
+      expect(native.clearLoggedCookies).toHaveBeenCalledTimes(1);
     });
   });
 

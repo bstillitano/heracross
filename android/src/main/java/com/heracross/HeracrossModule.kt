@@ -2,18 +2,18 @@ package com.heracross
 
 import android.app.Application
 import android.content.pm.ApplicationInfo
+import android.os.Handler
+import android.os.Looper
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
-import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.network.NetworkingModule
 import com.scizor.Scizor
 import com.scizor.ScizorGesture
-import com.scizor.feature.custom.DeveloperOption
-import com.scizor.feature.deeplink.DeepLinkPreset
 import com.scizor.feature.featureflags.FeatureFlag
 import com.scizor.feature.featureflags.FlagOverride
 import com.scizor.feature.servers.ServerEnvironment
@@ -26,10 +26,31 @@ import com.scizor.feature.servers.ServerEnvironment
  * them in the order JavaScript made them.
  */
 class HeracrossModule(reactContext: ReactApplicationContext) :
-  NativeHeracrossSpec(reactContext) {
+  NativeHeracrossSpec(reactContext), LifecycleEventListener {
 
   private val debuggable: Boolean
     get() = (reactApplicationContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+  private val mainHandler = Handler(Looper.getMainLooper())
+
+  // Main thread only.
+  private val flagTracker = FlagChangeTracker()
+  private val selectionTracker = SelectionTracker()
+  private var changeCheckScheduled = false
+
+  init {
+    reactContext.addLifecycleEventListener(this)
+    activeModule = this
+    installOverrideHook()
+    scheduleChangeCheck()
+  }
+
+  override fun invalidate() {
+    reactApplicationContext.removeLifecycleEventListener(this)
+    if (activeModule === this) activeModule = null
+    mainHandler.removeCallbacksAndMessages(null)
+    super.invalidate()
+  }
 
   override fun start(allowProductionBuilds: Boolean, captureNetwork: Boolean) {
     // Mirror Scizor's own production gate, so a refused start leaves React
@@ -48,8 +69,18 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
       }
     }
     val application = reactApplicationContext.applicationContext as? Application ?: return
-    onMain { Scizor.start(application, allowProductionBuilds) }
+    onMain {
+      Scizor.start(application, allowProductionBuilds)
+      // Scizor refuses exactly when `allowed` is false, and ignores later calls.
+      if (allowed) started = true
+      // Starting loads Scizor's store, so saved overrides and the saved
+      // server now apply.
+      scheduleChangeCheck()
+    }
   }
+
+  /** Posted behind any pending `start`, so it reflects that call. */
+  override fun isStarted(promise: Promise) = onMain { promise.resolve(started) }
 
   override fun showMenu() = onMain { Scizor.show() }
 
@@ -63,10 +94,16 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  override fun setDisabledFeatures(features: ReadableArray) {
+    val ids = features.strings().toSet()
+    onMain { Scizor.disabledFeatures = ids }
+  }
+
   // Feature flags
 
   override fun registerFeatureFlag(key: String, title: String, defaultValue: Boolean) = onMain {
     Scizor.featureFlags.register(FeatureFlag(key = key, title = title, defaultValue = defaultValue))
+    scheduleChangeCheck()
   }
 
   override fun isFeatureFlagEnabled(key: String, promise: Promise) = onMain {
@@ -75,49 +112,86 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
 
   override fun setFeatureFlagOverridesEnabled(enabled: Boolean) = onMain {
     Scizor.featureFlags.overridesEnabled = enabled
+    scheduleChangeCheck()
   }
 
   override fun setFeatureFlagOverride(key: String, value: Boolean) = onMain {
     Scizor.featureFlags.setOverride(key, if (value) FlagOverride.ON else FlagOverride.OFF)
+    scheduleChangeCheck()
   }
 
   override fun clearFeatureFlagOverride(key: String) = onMain {
     Scizor.featureFlags.setOverride(key, FlagOverride.REMOTE)
+    scheduleChangeCheck()
   }
 
-  override fun resetFeatureFlagOverrides() = onMain { Scizor.featureFlags.resetAllToRemote() }
+  override fun resetFeatureFlagOverrides() = onMain {
+    Scizor.featureFlags.resetAllToRemote()
+    scheduleChangeCheck()
+  }
 
   // Servers
 
   override fun configureServers(servers: ReadableArray) {
-    val environments = servers.maps().mapNotNull { server ->
-      val id = server.stringOrNull("id")?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-      ServerEnvironment(
-        name = id,
-        baseUrl = server.stringOrNull("baseUrl").orEmpty(),
-        variables = server.mapOrNull("variables").toStringMap(),
-      )
+    val environments = servers.toServerEnvironments()
+    onMain {
+      Scizor.servers.configure(environments)
+      scheduleChangeCheck()
     }
-    onMain { Scizor.servers.configure(environments) }
   }
 
   /** Scizor can only select a configured environment, so unknown ids are ignored. */
   override fun selectServer(id: String) = onMain {
     Scizor.servers.all().firstOrNull { it.name == id }?.let(Scizor.servers::select)
+    scheduleChangeCheck()
   }
 
   /** Scizor falls back to the first configured environment when none is saved. */
   override fun getSelectedServer(promise: Promise) = onMain {
-    val selected = Scizor.servers.selected
-    promise.resolve(
-      selected?.let {
-        Arguments.createMap().apply {
-          putString("id", it.name)
-          putString("baseUrl", it.baseUrl)
-          putMap("variables", Arguments.makeNativeMap(it.variables))
-        }
+    promise.resolve(Scizor.servers.selected?.toWritableMap())
+  }
+
+  // Change events
+
+  /**
+   * Scizor's menu runs in its own Activity, and it reports no server changes,
+   * so returning to the app is when a server picked in the menu is noticed.
+   */
+  override fun onHostResume() = scheduleChangeCheck()
+
+  override fun onHostPause() = Unit
+
+  override fun onHostDestroy() = Unit
+
+  /** Posts one check behind the work already queued, so a burst of changes is read once. */
+  private fun scheduleChangeCheck() {
+    mainHandler.post {
+      if (changeCheckScheduled) return@post
+      changeCheckScheduled = true
+      mainHandler.post {
+        changeCheckScheduled = false
+        checkForChanges()
       }
-    )
+    }
+  }
+
+  private fun checkForChanges() {
+    val flags = Scizor.featureFlags.all().associate { it.key to Scizor.featureFlags.isEnabled(it.key) }
+    val flagChanges = flagTracker.update(flags)
+    val selected = Scizor.servers.selected
+    val serverChanged = selectionTracker.update(selected?.name) != null
+    // React hands over the emitter once the module is in use; a check before
+    // then can only be recording the first snapshot.
+    if (mEventEmitterCallback == null) return
+    flagChanges.forEach { change ->
+      emitOnFeatureFlagChange(
+        Arguments.createMap().apply {
+          putString("key", change.key)
+          putBoolean("enabled", change.enabled)
+        }
+      )
+    }
+    if (serverChanged && selected != null) emitOnServerChange(selected.toWritableMap())
   }
 
   // Menu content
@@ -128,19 +202,12 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
   }
 
   override fun setDeveloperOptions(options: ReadableArray) {
-    val rows = options.maps().mapNotNull { option ->
-      val name = option.stringOrNull("name") ?: return@mapNotNull null
-      DeveloperOption.Value(title = name, value = option.stringOrNull("value").orEmpty())
-    }
+    val rows = options.toDeveloperOptions()
     onMain { Scizor.developerOptions = rows }
   }
 
   override fun setDeepLinkPresets(presets: ReadableArray) {
-    val links = presets.maps().mapNotNull { preset ->
-      val name = preset.stringOrNull("name") ?: return@mapNotNull null
-      val url = preset.stringOrNull("url") ?: return@mapNotNull null
-      DeepLinkPreset(name = name, url = url)
-    }
+    val links = presets.toDeepLinkPresets()
     onMain { Scizor.deepLinkPresets = links }
   }
 
@@ -154,6 +221,28 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
    * notification access is granted, so there is nothing to forward.
    */
   override fun logNotification(payload: ReadableMap) = Unit
+
+  // Cookies
+
+  override fun logCookie(cookie: ReadableMap) {
+    val parsed = cookie.toLoggedCookie() ?: return
+    onMain {
+      Scizor.cookies.log(
+        name = parsed.name,
+        value = parsed.value,
+        domain = parsed.domain,
+        path = parsed.path,
+        secure = parsed.secure,
+        httpOnly = parsed.httpOnly,
+        sameSite = parsed.sameSite,
+        expires = parsed.expires,
+      )
+    }
+  }
+
+  override fun captureWebViewCookies(url: String) = onMain { Scizor.cookies.captureWebView(url) }
+
+  override fun clearLoggedCookies() = onMain { Scizor.cookies.clear() }
 
   // Crashes and location
 
@@ -177,20 +266,12 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
     UiThreadUtil.runOnUiThread(work)
   }
 
-  private fun ReadableArray.maps(): List<ReadableMap> =
-    (0 until size()).mapNotNull { index ->
-      if (getType(index) == ReadableType.Map) getMap(index) else null
+  private fun ServerEnvironment.toWritableMap() =
+    Arguments.createMap().apply {
+      putString("id", name)
+      putString("baseUrl", baseUrl)
+      putMap("variables", Arguments.makeNativeMap(variables))
     }
-
-  /** Reads a string without throwing when JavaScript sent another type. */
-  private fun ReadableMap.stringOrNull(key: String): String? =
-    if (hasKey(key) && getType(key) == ReadableType.String) getString(key) else null
-
-  private fun ReadableMap.mapOrNull(key: String): ReadableMap? =
-    if (hasKey(key) && getType(key) == ReadableType.Map) getMap(key) else null
-
-  private fun ReadableMap?.toStringMap(): Map<String, String> =
-    this?.toHashMap()?.mapValues { (_, value) -> value?.toString().orEmpty() }.orEmpty()
 
   companion object {
     const val NAME = NativeHeracrossSpec.NAME
@@ -200,5 +281,28 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
      * slot is static, so this outlives module instances across JS reloads.
      */
     @Volatile private var networkHookInstalled = false
+
+    /** Whether Scizor has started, which, like Scizor, outlives reloads. */
+    @Volatile private var started = false
+
+    /** The module that receives Scizor's override callback. */
+    @Volatile private var activeModule: HeracrossModule? = null
+
+    private var overrideHookInstalled = false
+
+    /**
+     * Scizor reports override changes, including those made in the menu,
+     * through a single callback. Heracross installs it once per process and
+     * still calls whatever callback was there before.
+     */
+    private fun installOverrideHook() = synchronized(Companion) {
+      if (overrideHookInstalled) return
+      overrideHookInstalled = true
+      val previous = Scizor.featureFlags.onOverrideChanged
+      Scizor.featureFlags.onOverrideChanged = { key ->
+        previous?.invoke(key)
+        activeModule?.scheduleChangeCheck()
+      }
+    }
   }
 }

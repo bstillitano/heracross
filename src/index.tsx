@@ -1,5 +1,7 @@
-import { Platform } from 'react-native';
+import { Platform, type EventSubscription } from 'react-native';
 import NativeHeracross from './NativeHeracross';
+
+export type { EventSubscription };
 
 /**
  * How the debug menu is opened.
@@ -42,6 +44,14 @@ export interface FeatureFlag {
   defaultValue: boolean;
 }
 
+/** A registered flag whose effective value changed. */
+export interface FeatureFlagChange {
+  /** The flag's key. */
+  key: string;
+  /** Its new effective value. */
+  enabled: boolean;
+}
+
 /** A backend environment the menu can switch between. */
 export interface Server {
   /** Unique identifier, e.g. `"Staging"`. */
@@ -82,6 +92,55 @@ export interface DeepLinkPreset {
   url: string;
 }
 
+/**
+ * The id of one of Scizor's built-in tools, for
+ * {@link Heracross.setDisabledFeatures}. Any other string is accepted and
+ * ignored, so ids added in later Scizor releases can be passed too.
+ */
+export type ScizorFeature =
+  | 'network'
+  | 'servers'
+  | 'environment_variables'
+  | 'feature_flags'
+  | 'preferences'
+  | 'cookies'
+  | 'file_browser'
+  | 'database_browser'
+  | 'keystore'
+  | 'location'
+  | 'console'
+  | 'deep_link'
+  | 'crash_logs'
+  | 'notification_logger'
+  | 'notification_tester'
+  | 'fonts'
+  | 'interface_previews'
+  | 'grid_overlay'
+  | 'fps_counter'
+  | 'touch_visualiser'
+  | 'appearance'
+  | (string & {});
+
+/** A cookie to show in Scizor's Cookie Browser. */
+export interface Cookie {
+  /** The cookie's name. */
+  name: string;
+  /** Its value. */
+  value: string;
+  /** The domain it belongs to, e.g. `"example.com"`. */
+  domain: string;
+  /** The path it applies to, e.g. `"/"`. */
+  path?: string;
+  /** Whether it is only sent over HTTPS. Defaults to `false`. */
+  secure?: boolean;
+  /** Whether it is hidden from scripts. Defaults to `false`. */
+  httpOnly?: boolean;
+  /** Its `SameSite` attribute, e.g. `"Lax"`. */
+  sameSite?: string;
+  /** When it expires, shown as written, e.g. `"Wed, 21 Oct 2026 07:28:00 GMT"`. */
+  expires?: string;
+}
+
 /** Scyther's location spoofer, as the app currently sees it. */
 export interface LocationSpoofingState {
   /** Whether a spoofed location is switched on in the menu. */
@@ -101,6 +160,11 @@ const gestures: ReadonlyArray<string> = ['shake', 'floatingButton', 'none'];
 /** `null` and `undefined` become `''`; everything else goes through `String`. */
 function toText(value: unknown): string {
   return value == null ? '' : String(value);
+}
+
+/** `null` and `undefined` stay `null`; everything else goes through `String`. */
+function toOptionalText(value: unknown): string | null {
+  return value == null ? null : String(value);
 }
 
 function toStringMap(values: Record<string, unknown> | undefined) {
@@ -124,6 +188,16 @@ export const Heracross = {
       options.allowProductionBuilds ?? false,
       options.captureNetwork ?? true
     );
+  },
+
+  /**
+   * Whether the toolkit has started. It stays `false` after a `start` call
+   * the toolkit refused, such as in a store build without
+   * `allowProductionBuilds`. Calls made before it, including `start`, have
+   * taken effect by the time it resolves.
+   */
+  isStarted(): Promise<boolean> {
+    return NativeHeracross.isStarted();
   },
 
   /**
@@ -156,6 +230,16 @@ export const Heracross = {
     NativeHeracross.setInvocationGesture(gesture);
   },
 
+  /**
+   * Hides built-in tools from the menu by id, replacing the previous list;
+   * pass `[]` to show them all again. For a build that leaves your team, such
+   * as one started with `allowProductionBuilds`. Android only: Scyther can't
+   * hide its tools, so iOS ignores it.
+   */
+  setDisabledFeatures(features: ReadonlyArray<ScizorFeature>): void {
+    NativeHeracross.setDisabledFeatures(features.map(toText));
+  },
+
   featureFlags: {
     /**
      * Registers one or more flags so they appear, and can be overridden, in
@@ -176,8 +260,8 @@ export const Heracross = {
     /**
      * The flag's effective value: its local override when overrides are
      * enabled and one is set, otherwise its default. Resolves `false` for a
-     * flag that was never registered. This is a one-off read; Heracross
-     * doesn't notify you when a tester changes a flag in the menu.
+     * flag that was never registered. To hear about later changes, use
+     * {@link Heracross.featureFlags.addListener}.
      */
     isEnabled(key: string): Promise<boolean> {
       return NativeHeracross.isFeatureFlagEnabled(toText(key));
@@ -210,6 +294,18 @@ export const Heracross = {
     resetOverrides(): void {
       NativeHeracross.resetFeatureFlagOverrides();
     },
+
+    /**
+     * Calls `listener` each time a registered flag's effective value changes:
+     * from the menu, from the override methods above, or from registering the
+     * flag again with a different default. A flag's first registration isn't a
+     * change. Call `remove()` on the result to stop listening.
+     */
+    addListener(listener: (change: FeatureFlagChange) => void): EventSubscription {
+      return NativeHeracross.onFeatureFlagChange((change) => {
+        listener({ key: change.key, enabled: change.enabled });
+      });
+    },
   },
 
   servers: {
@@ -239,12 +335,30 @@ export const Heracross = {
     /**
      * The selected environment: the saved selection, or the first configured
      * environment when there's none. Resolves `null` only when no environments
-     * are configured. Heracross doesn't notify you when a tester switches
-     * environments in the menu, so read it again when you need it.
+     * are configured. To hear about later changes, use
+     * {@link Heracross.servers.addListener}.
      */
     async getSelected(): Promise<SelectedServer | null> {
       const server = await NativeHeracross.getSelectedServer();
       return (server as SelectedServer | null) ?? null;
+    },
+
+    /**
+     * Calls `listener` with the newly selected environment each time the
+     * selection moves to a different id: from the menu, from `select`, or from
+     * `configure` replacing the selected environment. The first selection isn't
+     * a change. On iOS a pick in the menu is reported straight away; on Android
+     * it is reported when the menu closes. Call `remove()` on the result to
+     * stop listening.
+     */
+    addListener(listener: (server: SelectedServer) => void): EventSubscription {
+      return NativeHeracross.onServerChange((server) => {
+        listener({
+          id: server.id,
+          baseUrl: server.baseUrl,
+          variables: server.variables as Record<string, string>,
+        });
+      });
     },
   },
 
@@ -297,6 +411,40 @@ export const Heracross = {
   /** The FCM registration token shown in the Notifications section; `null` clears it. */
   setFcmToken(token: string | null): void {
     NativeHeracross.setFcmToken(token ?? null);
+  },
+
+  cookies: {
+    /**
+     * Adds a cookie to Scizor's Cookie Browser, alongside those Scizor sees in
+     * captured traffic. Android only: on iOS, Scyther's Cookie Browser lists
+     * the shared `HTTPCookieStorage`, where React Native's networking already
+     * keeps its cookies.
+     */
+    log(cookie: Cookie): void {
+      NativeHeracross.logCookie({
+        name: toText(cookie.name),
+        value: toText(cookie.value),
+        domain: toText(cookie.domain),
+        path: toOptionalText(cookie.path),
+        secure: Boolean(cookie.secure),
+        httpOnly: Boolean(cookie.httpOnly),
+        sameSite: toOptionalText(cookie.sameSite),
+        expires: toOptionalText(cookie.expires),
+      });
+    },
+
+    /**
+     * Adds every cookie the Android WebView cookie store holds for `url`, such
+     * as those set in a `react-native-webview`. Android only.
+     */
+    captureWebView(url: string): void {
+      NativeHeracross.captureWebViewCookies(toText(url));
+    },
+
+    /** Removes the cookies added with `log` and `captureWebView`. Android only. */
+    clear(): void {
+      NativeHeracross.clearLoggedCookies();
+    },
   },
 
   crashes: {

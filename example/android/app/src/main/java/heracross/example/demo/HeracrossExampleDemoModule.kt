@@ -20,16 +20,15 @@ import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.PermissionAwareActivity
 import com.facebook.react.modules.core.PermissionListener
-import com.scizor.Scizor
 import kotlin.random.Random
 
 /**
  * The example app's demo data on Android, ported from ScytherExample
  * (`ScytherExampleApp.swift`, `ContentView.swift`, `LocationTestView.swift`):
- * cookies, UserDefaults-style preferences and a SQLite database with the same
- * records, for Scizor's browsers, and `LocationManager` for the Location tab.
- * Where ScytherExample has nothing to port, such as logging cookies to Scizor,
- * it follows Scizor's sample app.
+ * UserDefaults-style preferences and a SQLite database with the same records,
+ * for Scizor's browsers, and `LocationManager` for the Location tab. The
+ * example's cookies are logged from JavaScript, in `src/setup.ts`. Where
+ * ScytherExample has nothing to port, it follows Scizor's sample app.
  */
 class HeracrossExampleDemoModule(reactContext: ReactApplicationContext) :
   NativeHeracrossExampleDemoSpec(reactContext) {
@@ -53,24 +52,6 @@ class HeracrossExampleDemoModule(reactContext: ReactApplicationContext) :
   // Launch data
 
   override fun seedDemoData() {
-    // ScytherExample puts these in HTTPCookieStorage; Scizor's Cookie Browser
-    // shows cookies the app logs, as Scizor's own sample does.
-    Scizor.cookies.log(
-      name = "session_id", value = "abc123def456", domain = "example.com",
-      path = "/", secure = true, expires = "7 days",
-    )
-    Scizor.cookies.log(
-      name = "user_prefs", value = "theme=dark&lang=en", domain = "example.com",
-      path = "/", expires = "30 days",
-    )
-    Scizor.cookies.log(
-      name = "_ga", value = "GA1.2.1234567890.1234567890", domain = "analytics.example.com",
-      path = "/", expires = "1 year",
-    )
-    Scizor.cookies.log(
-      name = "auth_token", value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", domain = "api.example.com",
-      path = "/api", secure = true, expires = "1 day",
-    )
     runCatching { seedDatabase() }
   }
 

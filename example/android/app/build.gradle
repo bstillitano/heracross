@@ -108,8 +108,6 @@ android {
 }
 
 dependencies {
-    // The demo module logs cookies to Scizor directly, as Scizor's own sample does.
-    implementation("com.github.bstillitano:scizor:v0.2.2")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
