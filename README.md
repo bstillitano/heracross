@@ -725,7 +725,7 @@ Scyther's README documents only Swift Package Manager installation, and React Na
 
 ### Why do I need to patch React Native?
 
-React Native 0.87's SPM autolinker hardcodes iOS 15 on the package that links every library, and Scyther needs iOS 16. The patch changes that one value. It stops being necessary once React Native derives the version from your app.
+React Native 0.87's SPM autolinker hardcodes iOS 15 on the package that links every library, and Scyther needs iOS 16. The patch changes that one value. It stops being necessary once React Native derives the version from your app, which [react/react-native#58515](https://github.com/react/react-native/issues/58515) asks for.
 
 ### Does it work with Expo?
 

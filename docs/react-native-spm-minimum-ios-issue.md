@@ -1,6 +1,6 @@
-# Draft: upstream React Native issue
+# Upstream React Native issue
 
-Not yet filed. Target: https://github.com/facebook/react-native/issues
+Filed as [react/react-native#58515](https://github.com/react/react-native/issues/58515). The filed version quotes the patch inline and adds the template's environment and reproducer sections; the text below is the draft it came from.
 
 ---
 
