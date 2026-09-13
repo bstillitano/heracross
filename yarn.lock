@@ -4157,7 +4157,7 @@ __metadata:
     "@react-native/typescript-config": "npm:0.87.1"
     "@types/react": "npm:^19.2.0"
     react: "npm:19.2.3"
-    react-native: "patch:react-native@npm%3A0.87.1#~/.yarn/patches/react-native-npm-0.87.1-f618c82e97.patch"
+    react-native: "npm:0.87.1"
     react-native-builder-bob: "npm:^0.43.1"
     react-native-monorepo-config: "npm:^0.4.0"
   languageName: unknown
@@ -4174,7 +4174,7 @@ __metadata:
     del-cli: "npm:^7.0.0"
     jest: "npm:^29.7.0"
     react: "npm:19.2.3"
-    react-native: "patch:react-native@npm%3A0.87.1#~/.yarn/patches/react-native-npm-0.87.1-f618c82e97.patch"
+    react-native: "npm:0.87.1"
     react-native-builder-bob: "npm:^0.43.1"
     turbo: "npm:^2.10.8"
     typescript: "npm:^6.0.3"

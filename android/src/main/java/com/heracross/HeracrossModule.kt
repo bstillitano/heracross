@@ -8,7 +8,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.UiThreadUtil
-import com.facebook.react.modules.network.OkHttpClientProvider
+import com.facebook.react.modules.network.NetworkingModule
 import com.scizor.Scizor
 import com.scizor.ScizorGesture
 import com.scizor.feature.custom.DeveloperOption
@@ -32,11 +32,11 @@ class HeracrossModule(reactContext: ReactApplicationContext) :
     // Mirror Scizor's own production gate so a refused start leaves React
     // Native's networking untouched.
     if (captureNetwork && (debuggable || allowProductionBuilds)) {
-      OkHttpClientProvider.setOkHttpClientFactory {
-        OkHttpClientProvider.createClientBuilder(application)
-          .addInterceptor(Scizor.network.interceptor())
-          .build()
-      }
+      // React Native applies this builder to every request it sends, so traffic is
+      // captured however early its networking module built the client, and any
+      // OkHttpClientFactory the app installed stays in place.
+      val interceptor = Scizor.network.interceptor()
+      NetworkingModule.setCustomClientBuilder { builder -> builder.addInterceptor(interceptor) }
     }
     onMain { Scizor.start(application, allowProductionBuilds) }
   }

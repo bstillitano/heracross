@@ -113,9 +113,13 @@ public final class HeracrossScyther: NSObject {
 
     // MARK: - Crashes
 
+    /// Scyther compiles its test crash into DEBUG builds only, so in any other
+    /// configuration this does nothing.
     @objc(triggerTestCrash)
     public static func triggerTestCrash() {
+        #if DEBUG
         onMain { Scyther.crashes.triggerTestCrash() }
+        #endif
     }
 
     // MARK: - Location

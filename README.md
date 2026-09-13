@@ -9,20 +9,20 @@
 
 [![CI](https://github.com/bstillitano/heracross/actions/workflows/ci.yml/badge.svg)](https://github.com/bstillitano/heracross/actions/workflows/ci.yml)
 ![platform-badge](https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue)
-![react-native-badge](https://img.shields.io/badge/react--native-0.87%2B-61DAFB)
+![react-native-badge](https://img.shields.io/badge/react--native-0.87-61DAFB)
 ![architecture-badge](https://img.shields.io/badge/architecture-New%20Architecture-purple)
 ![license-badge](https://img.shields.io/badge/license-MIT-green)
 
-A comprehensive React Native debugging toolkit that helps you cut through bugs in your React Native app. Heracross gives developers, QA testers, UI/UX teams and backend engineers an in-app debug menu, one shake away, on both platforms. Made with love in Sydney, Australia.
+A React Native debugging toolkit that helps you cut through bugs in your React Native app. Heracross gives developers, QA testers, UI/UX teams and backend engineers an in-app debug menu on both platforms. Made with love in Sydney, Australia.
 
-Heracross doesn't reimplement a debugging toolkit. It brings two proven native ones to React Native and puts one JavaScript API over them:
+Heracross doesn't reimplement a debugging toolkit. It brings two native ones to React Native and puts one JavaScript API over them:
 
 | Platform | Toolkit | Distribution |
 |---|---|---|
 | iOS | [Scyther](https://github.com/bstillitano/Scyther) | Swift Package Manager |
 | Android | [Scizor](https://github.com/bstillitano/scizor) | JitPack |
 
-Your app gets each platform's full native menu, including network logs, data browsers, location spoofing and interface tools, while you configure the parts you share (feature flags, server environments, environment variables and more) once, from JavaScript.
+Your app gets each platform's native menu, including network logs, data browsers, location spoofing and interface tools, and you configure the parts both share (feature flags, server environments, environment variables and more) once, from JavaScript.
 
 ## Table of Contents
 
@@ -30,6 +30,7 @@ Your app gets each platform's full native menu, including network logs, data bro
   - [Device & Application](#device--application)
   - [Networking](#networking)
   - [Data](#data)
+  - [Security](#security)
   - [System Tools](#system-tools)
   - [Notifications](#notifications)
   - [UI/UX Tools](#uiux-tools)
@@ -56,87 +57,96 @@ Your app gets each platform's full native menu, including network logs, data bro
 - [API Reference](#api-reference)
 - [FAQ](#faq)
 - [Contributing](#contributing)
-- [Security](#security)
+- [Reporting a Vulnerability](#reporting-a-vulnerability)
 - [License](#license)
 - [Credits](#credits)
 
 ## Features
 
-Everything below lives in the native debug menu, and most of it needs no setup at all. Features marked **JS** are also configured or driven from JavaScript through Heracross. A dash means the platform's toolkit doesn't have that feature.
+Everything below lives in the native debug menu. Features marked **JS** are also configured or driven from JavaScript through Heracross. A dash means that platform's toolkit doesn't have the feature. Menu paths use each toolkit's own section and row names.
 
 ### Device & Application
 
-| Feature | What it does | iOS | Android |
-|---|---|:---:|:---:|
-| Device info | Model, OS version and hardware details | ✓ | ✓ |
-| App info | Bundle identifier or package, version and build number | ✓ | ✓ |
-| Build details | Release type (Debug, TestFlight, App Store), build date and process ID | ✓ | — |
+| Feature | iOS (Scyther) | Android (Scizor) |
+|---|---|---|
+| Device info | OS version, hardware, release year, UUID | OS version, API level, manufacturer, model, hardware, device ID |
+| App info | Display name, bundle ID, version, build number, app ID prefix | Name, package, version, build number, last install or update time |
+| Process ID | ✓ | ✓ |
+| Build type | Debug, TestFlight or App Store | Debug or Release (flagged on an emulator) |
+| Build date | ✓ | — |
 
 ### Networking
 
 | Feature | What it does | iOS | Android |
 |---|---|:---:|:---:|
-| Network logging | Captures every HTTP request and response your app makes, including React Native's own `fetch` | ✓ | ✓ |
-| Request details | Headers, body, status and timing, with JSON pretty-printed and GraphQL operations decoded | ✓ | ✓ |
-| cURL export | Copy any captured request as a runnable `curl` command | ✓ | ✓ |
+| Network logging | Logs every HTTP request React Native sends, including `fetch` and `XMLHttpRequest` | ✓ | ✓ |
+| Request details | Headers, body, status and timing, with JSON pretty-printed and GraphQL operation names and types decoded | ✓ | ✓ |
+| cURL export | Copy a captured request as a `curl` command | ✓ | ✓ |
 | Log export | Share captured traffic as a HAR 1.2 file, with best-effort redaction | ✓ | — |
 | Traffic stats | Failure rate, median and 95th percentile duration, slowest endpoints and a request waterfall | ✓ | — |
 | Request overrides | Mock responses, serve local files, rewrite headers, and add latency or failures | ✓ | — |
-| Request replay | Edit any captured request and send it again | ✓ | — |
-| Breakpoints | Hold a request or response, edit it, then continue or fail it | ✓ | — |
-| Network conditioning | Latency, a bandwidth ceiling and a failure rate for all traffic | ✓ | — |
-| Server configuration **JS** | Switch between development, staging and production environments | ✓ | ✓ |
+| Request replay | Edit a captured request and send it again | ✓ | — |
+| Breakpoints | Hold a request or response, edit it, then continue or abort it | ✓ | — |
+| Network conditioning | Latency, a bandwidth ceiling and a failure rate for all intercepted traffic | ✓ | — |
+| Server configuration **JS** | Switch between environments, each with its own variables | ✓ | ✓ |
+| Environment variables **JS** | Show key/value pairs on their own screen | ✓ | ✓ |
 | IP address | The device's public IP | ✓ | ✓ |
 
 ### Data
 
-| Feature | What it does | iOS | Android |
-|---|---|:---:|:---:|
-| Feature flags **JS** | Register flags in code and override them at runtime | ✓ | ✓ |
-| Preferences browser | View and edit `UserDefaults` or `SharedPreferences` | ✓ | ✓ |
-| Cookie browser | Inspect and delete HTTP cookies | ✓ | ✓ |
-| Keychain / Keystore browser | Inspect keychain items or AndroidKeyStore entries | ✓ | ✓ |
-| File browser | Browse and preview the app sandbox | ✓ | ✓ |
-| Database browser | Browse and edit SQLite databases (plus Core Data and SwiftData on iOS, Room on Android) | ✓ | ✓ |
+| Feature | iOS (Scyther) | Android (Scizor) |
+|---|---|---|
+| Feature flags **JS** | Override registered flags at runtime | Force registered flags On, Off or Remote at runtime |
+| Preferences browser | View and edit `UserDefaults` | View and edit `SharedPreferences` |
+| Cookie browser | Inspect and delete cookies in `HTTPCookieStorage` | Cookies seen in captured traffic, logged by the app or captured from a WebView; hide one, or clear all |
+| File browser | Browse Documents, Library, Caches and tmp | Browse the app's private and app-specific external storage; preview, share, open or delete files |
+| Database browser | Browse and edit SQLite databases (including Core Data and SwiftData stores) in Application Support, Documents and Library, with a SQL editor | Browse and edit SQLite databases (including Room's) in the app's databases directory, with a raw SQL editor |
+
+### Security
+
+| Feature | iOS (Scyther) | Android (Scizor) |
+|---|---|---|
+| Keychain / Keystore | View and delete keychain items | List AndroidKeyStore entries with certificate details, and delete them |
 
 ### System Tools
 
-| Feature | What it does | iOS | Android |
-|---|---|:---:|:---:|
-| Location spoofing **JS** | Fake GPS with preset cities, custom coordinates or a moving route | ✓ | ✓ |
-| Deep link tester | Fire URLs and schemes from presets, history or a QR scan | ✓ | ✓ |
-| Crash logs **JS** | Captured crashes with their stack traces, shown on the next launch | ✓ | ✓ |
-| Console logger | Live native console output (stdout and stderr, or Logcat) | ✓ | ✓ |
+| Feature | iOS (Scyther) | Android (Scizor) |
+|---|---|---|
+| Location spoofing | Preset cities, custom coordinates and routes. **JS** can read its state | Preset cities, custom coordinates and routes, once the app declares `ACCESS_MOCK_LOCATION` and is the device's mock location app |
+| Deep link tester | Presets, history and a QR scanner | Presets and history; a QR scanner when the app adds Google's code scanner library |
+| Crash logs **JS** | Uncaught Objective-C exceptions, listed after relaunch | Uncaught exceptions on any thread, listed on later launches |
+| Console logs | The app's stdout and stderr | The app's own Logcat output |
 
 ### Notifications
 
-| Feature | What it does | iOS | Android |
-|---|---|:---:|:---:|
-| Notification tester | Schedule local test notifications | ✓ | ✓ |
-| Notification logger | View received notification payloads | ✓ | ✓ |
-| Token display **JS** | Show the APNs and FCM device tokens | ✓ | FCM only |
+| Feature | iOS (Scyther) | Android (Scizor) |
+|---|---|---|
+| Notification tester | Schedule local test notifications | Post or schedule local test notifications (needs notification permission on Android 13+) |
+| Notification logger | Payloads your native code passes to `Scyther.notifications.logNotification(_:)` | Notifications posted on the device, once notification access is granted |
+| Tokens **JS** | APNs and FCM tokens | FCM token |
 
 ### UI/UX Tools
 
-| Feature | What it does | iOS | Android |
-|---|---|:---:|:---:|
-| Grid overlay | An alignment grid over your UI | ✓ | ✓ |
-| FPS counter | Real-time frame rate, colour-coded | ✓ | ✓ |
-| Touch visualiser | Show touches for demos and recordings | ✓ | ✓ |
-| Appearance overrides | Force light or dark mode, high contrast and text size | ✓ | ✓ |
-| Font browser | Browse the available fonts | ✓ | ✓ |
-| Accessibility audit | Flags missing labels, small touch targets and low-contrast text, including in React Native views | ✓ | — |
-| Layout guides and ruler | Draw safe areas and margins, and measure between points | ✓ | — |
-| View frames, sizes and hierarchy | Highlight view bounds and browse a snapshot of the view tree | ✓ | — |
-| Slow animations | Slow every animation down | ✓ | — |
-| Language and pseudo-localisation | Force the app's language, or stress-test layouts before translation | ✓ | — |
+| Feature | iOS | Android |
+|---|:---:|:---:|
+| Grid overlay, FPS counter and touch visualiser | ✓ | ✓, once "Display over other apps" is granted |
+| Show view frames and view sizes | ✓ | ✓, once "Display over other apps" is granted |
+| Slow animations | ✓ | ✓ |
+| Fonts | ✓ | ✓ |
+| Interface previews (registered natively) | ✓ | ✓ |
+| Appearance: light or dark mode | ✓ | ✓ on Android 12+ |
+| Appearance: text size | ✓ | Font scale, once your Activity wraps its context with `Scizor.wrapAppearance()` |
+| Appearance: contrast | Increase Contrast | High contrast in Scizor's own menu only |
+| Accessibility audit: missing labels, touch targets and contrast, including in React Native views | ✓ | — |
+| Layout guides and layout ruler | ✓ | — |
+| View hierarchy | ✓ | — |
+| Language and pseudo-localisation | ✓ | — |
 
 ### Development Tools
 
 | Feature | What it does | iOS | Android |
 |---|---|:---:|:---:|
-| Custom developer options **JS** | Add your own rows to the menu | ✓ | ✓ |
-| Environment variables **JS** | Surface any key/value pairs you want visible | ✓ | ✓ |
+| Custom developer options **JS** | Your own value rows in the menu's Development Tools section | ✓ | ✓ |
 
 For the full detail on any feature, see [Scyther's README](https://github.com/bstillitano/Scyther#features) or [Scizor's README](https://github.com/bstillitano/scizor#features).
 
@@ -144,36 +154,34 @@ For the full detail on any feature, see [Scyther's README](https://github.com/bs
 
 | | Requirement |
 |---|---|
-| React Native | 0.87+, with the New Architecture |
-| iOS | 16.0+, built with React Native's Swift Package Manager integration (CocoaPods is not supported) |
-| Xcode | 16+ |
-| Android | `minSdk` 24 at runtime; `compileSdk` 37, AGP 9.1+, Kotlin 2.2+ and JDK 17 to build, which are React Native 0.87's defaults |
+| React Native | 0.87 (tested with 0.87.1). The New Architecture is the only one it supports. |
+| iOS | 16.0 or later, built with React Native's Swift Package Manager integration. CocoaPods isn't supported. |
+| Xcode | 16.1 or later, React Native 0.87's minimum. Tested with Xcode 26.2. |
+| Android | `minSdk` 24. Builds with React Native 0.87's defaults: `compileSdk` 37, AGP 9.2.1, Kotlin 2.2.0 and JDK 17 or later. |
 
-Scizor pulls Material 3 `1.5.0-alpha` into your debug build. Read [Scizor's requirements](https://github.com/bstillitano/scizor#requirements) before adopting.
+Scizor depends on Material 3 `1.5.0-alpha`, which ends up in your app. Read [Scizor's requirements](https://github.com/bstillitano/scizor#requirements) before adopting.
 
 ## Installation
 
-```sh
-npm install heracross
-```
+Heracross isn't published to npm yet.
 
 ### Android
 
-Nothing else to do. Scizor is resolved from JitPack, which the React Native Gradle plugin adds to every project. If you have turned that off with `includeJitpackRepository=false`, add `maven { url "https://jitpack.io" }` to your repositories.
+Nothing else to do. Scizor is resolved from JitPack, which the React Native Gradle plugin adds to every project by default. If you have turned that off with `includeJitpackRepository=false` or `react.includeJitpackRepository=false`, add `maven { url "https://jitpack.io" }` to your repositories.
 
 ### iOS
 
-Heracross is Swift Package Manager only. Your app has to use React Native's SPM integration instead of CocoaPods:
+Heracross ships Swift Package Manager support only, so your app has to use React Native's SPM integration:
 
 ```sh
 npx react-native spm
 ```
 
-On a freshly created CocoaPods app, this migrates the project for you (`add --deintegrate`). After that, rerun it whenever you add or remove a native dependency.
+On a project that isn't set up for SPM yet, this runs `add`. It converts a CocoaPods app automatically only when that app is unmodified from the template, with its Xcode project and Podfile committed; otherwise run `npx react-native spm add --deintegrate`. Once the project is set up, run `npx react-native spm update` whenever you add or remove a native dependency.
 
-Three more steps:
+Then:
 
-1. **Tell the React Native CLI that Heracross has iOS code.** The CLI only recognises iOS native modules that ship a podspec, so without this override the SPM autolinker skips Heracross entirely. In your app's `react-native.config.js`:
+1. **Tell the React Native CLI that Heracross has iOS code.** The CLI only recognises iOS code in packages that ship a podspec, and React Native's SPM autolinker skips any package without iOS code. In your app's `react-native.config.js`:
 
    ```js
    module.exports = {
@@ -189,7 +197,7 @@ Three more steps:
 
 2. **Raise your deployment target to iOS 16**, the minimum Scyther supports.
 
-3. **Patch React Native's SPM autolinker.** React Native 0.87 generates the package that links every library with a hardcoded minimum of iOS 15, and SwiftPM will not let it depend on a package that needs iOS 16:
+3. **Patch React Native's SPM autolinker.** React Native 0.87 writes the package that links every library with a hardcoded minimum of iOS 15, and SwiftPM won't let it depend on a package that needs iOS 16:
 
    ```
    error: The package product 'Heracross' requires minimum platform version 16.0 for the iOS platform,
@@ -203,11 +211,11 @@ Three more steps:
 
    Then run `npx react-native spm update`. Remove the patch once React Native stops hardcoding the version.
 
-SwiftPM fetches Scyther itself from GitHub when Xcode resolves packages.
+SwiftPM fetches Scyther from GitHub when Xcode resolves packages.
 
 ## Quick Start
 
-Start the toolkit once, as early as possible: at the top of your entry file, before your app makes any network request.
+Start the toolkit once, at the top of your entry file, before your app makes any network request:
 
 ```ts
 import { AppRegistry } from 'react-native';
@@ -219,17 +227,19 @@ Heracross.start();
 AppRegistry.registerComponent('MyApp', () => App);
 ```
 
-Now **shake the device**, or press `Cmd + Ctrl + Z` in the iOS Simulator, to open the menu. You can also open it from code:
+Then open the menu from code:
 
 ```ts
 Heracross.showMenu();
 ```
 
+Shaking the device opens it too. In an iOS debug build a shake also opens React Native's Dev Menu, so you may prefer `Heracross.setInvocationGesture('none')` and a button of your own.
+
 ## Usage Guide
 
 ### Feature Flags
 
-Register flags with their default (remote) values. Testers can override any of them from the menu without a rebuild.
+Register flags with their default values. Testers can override any of them from the menu without a rebuild.
 
 ```ts
 Heracross.featureFlags.register([
@@ -242,7 +252,7 @@ if (await Heracross.featureFlags.isEnabled('new_checkout')) {
 }
 ```
 
-`isEnabled` resolves to the local override set in the menu, or to `defaultValue` when there is none. Android shows `title` in the menu; iOS shows the key.
+Overrides only take effect once they're switched on in the menu's Feature Flags screen. Until then, and for any flag without an override, `isEnabled` resolves to `defaultValue`. It resolves `false` for a key that was never registered. Android lists each flag by `title`; iOS lists it by key.
 
 ### Server Configuration
 
@@ -261,11 +271,11 @@ const server = await Heracross.servers.getSelected();
 // { id: 'Staging', baseUrl: 'https://staging.example.com', variables: {...} }
 ```
 
-Scyther has no base URL field, so on iOS `baseUrl` is stored, and shown in the menu, as a `baseUrl` variable. On iOS, `configure` adds or replaces servers by id; on Android it replaces the whole list.
+Scyther has no base URL field, so on iOS `baseUrl` is stored as a `baseUrl` variable. On iOS, `configure` adds or replaces servers by id; on Android it replaces the whole list.
 
 ### Environment Variables
 
-Surface any key/value pairs your team needs to see at a glance:
+Show key/value pairs on the menu's Environment Variables screen, under Networking:
 
 ```ts
 Heracross.setEnvironmentVariables({
@@ -276,7 +286,7 @@ Heracross.setEnvironmentVariables({
 
 ### Custom Developer Options
 
-Add read-only rows to the menu's Developer section:
+Add read-only value rows to the menu's Development Tools section. The section only appears once you've added a row.
 
 ```ts
 Heracross.setDeveloperOptions([
@@ -287,6 +297,8 @@ Heracross.setDeveloperOptions([
 
 ### Push Tokens
 
+Tokens show in the menu's Notifications section:
+
 ```ts
 Heracross.setFcmToken(fcmToken);
 Heracross.setApnsToken(apnsToken); // iOS only
@@ -294,33 +306,49 @@ Heracross.setApnsToken(apnsToken); // iOS only
 
 ### Network Logging
 
-- **iOS:** Scyther intercepts `URLSession` traffic by itself, so React Native's `fetch` shows up without any setup.
-- **Android:** `start()` installs an `OkHttpClientProvider` factory that adds Scizor's interceptor to React Native's OkHttp client. That factory replaces any your app installed. If you install your own, pass `captureNetwork: false` and add `Scizor.network.interceptor()` to your builder yourself. React Native builds its client the first time the networking module is used, so traffic is only captured when `start()` runs before your first request.
+Pass nothing and React Native's requests are logged from the moment `start()` runs.
+
+- **iOS:** Scyther adds its URL protocol to every `URLSessionConfiguration` created after it starts. React Native creates its session when it sends its first request, so that request and every one after it are logged, as long as `Heracross.start()` runs first.
+- **Android:** Heracross registers Scizor's interceptor through `NetworkingModule.setCustomClientBuilder`, which React Native applies to every request it sends, so requests sent after `start()` are logged. That hook is a single slot: if your app registers its own builder there, whichever is registered last wins. Pass `captureNetwork: false` to leave it alone.
 
 ### Crash Logging
 
-Crashes are captured automatically and shown in the menu's Crash Logs on the next launch. To check the pipeline end to end:
+Crashes appear in the menu under System Tools → Crash Logs after the app is relaunched. To check it end to end:
 
 ```ts
 Heracross.crashes.triggerTestCrash();
 ```
 
-On iOS this calls Scyther's test crash. Scizor has no equivalent, so on Android Heracross throws on the main thread, which Scizor records.
+- **iOS:** Scyther records uncaught Objective-C exceptions, not Swift runtime errors or signals. The test crash raises one, and Scyther only compiles it into Debug builds, so in other configurations the call does nothing.
+- **Android:** Scizor records uncaught exceptions from any thread. Scizor has no test crash of its own, so Heracross throws on the main thread.
 
 ### Location Spoofing
 
-Spoof the device's location from the menu's Location Spoofer. On iOS you can read the spoofer's state from JavaScript:
+Spoof the device's location from the menu, under System Tools → Location Spoofer. On iOS you can read the spoofer's state from JavaScript:
 
 ```ts
 const state = await Heracross.location.getSpoofingState();
-// { enabled: true, swizzled: true, locationName: 'Sydney', latitude: -33.86, longitude: 151.21 }
+// { enabled, swizzled, locationName, latitude, longitude }
 ```
 
-It resolves `null` on Android, where Scizor keeps its spoofer internal. A spoofed location still reaches `LocationManager`; set your app as the device's mock-location app first.
+It resolves `null` on Android, where Scizor keeps its spoofer internal.
+
+On Android, Scizor can only spoof once your app declares `ACCESS_MOCK_LOCATION` and is selected under Developer options → Select mock location app. Declare the permission in your debug manifest, as the example app does in `example/android/app/src/debug/AndroidManifest.xml`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation,ProtectedPermissions" />
+
+</manifest>
+```
 
 ### Going Native
 
-Heracross covers what both toolkits share. For everything else, such as custom screens, interface previews, deep link presets or database adapters, configure the toolkit natively. On Android, add Scizor as a dependency of your app module and call it from your `Application`; the [example app](#example-app) does this to log cookies.
+Heracross covers what both toolkits share. Everything else, such as custom screens, interface previews, deep link presets or database adapters, is configured natively. On Android, add Scizor as a dependency of your app module to call it directly; the [example app](#example-app) does this to log cookies.
 
 ## Menu Invocation
 
@@ -330,31 +358,34 @@ Heracross.setInvocationGesture('floatingButton'); // Android only; iOS uses 'non
 Heracross.setInvocationGesture('none');           // open it with Heracross.showMenu()
 ```
 
-A floating button is the easiest trigger on an Android emulator, where shaking is awkward. Close the menu from code with `Heracross.hideMenu()`.
+On Android the floating button is attached when an Activity resumes. When `start()` runs from JavaScript, your Activity has usually resumed already, so the button appears the next time the app comes back to the foreground. Close the menu from code with `Heracross.hideMenu()`.
 
 ## Production Safety
 
-Both toolkits refuse to start in a store build. Scyther checks for an App Store receipt, and Scizor checks that the build is debuggable. When they refuse, `start()` does nothing, and on Android React Native's networking is left untouched.
+Both toolkits refuse to start in a store build unless you opt in:
 
-To ship the menu in a signed QA build on purpose:
+- **iOS:** Scyther treats a build as App Store when it isn't a Debug build, isn't running on the simulator and has no sandbox receipt. `start()` then does nothing, silently. Ad hoc and enterprise builds meet that test too.
+- **Android:** Scizor refuses to start when the app isn't debuggable, and logs a warning. Heracross then leaves React Native's networking untouched.
+
+To run the menu in a signed QA build on purpose:
 
 ```ts
 Heracross.start({ allowProductionBuilds: true });
 ```
 
-**Warning:** this can expose sensitive debugging information, such as network traffic, preferences and keychain contents, to anyone holding the build.
+**Warning:** anyone holding that build can see network traffic, preferences, cookies and keychain or keystore contents.
 
 ## Example App
 
-`example/` is a React Native port of Scyther's own example app, with the same Home and Location tabs and the same sections:
+`example/` is a React Native port of Scyther's example app, with the same Home and Location tabs and the same sections:
 
 - **Home:** open the menu, REST and GraphQL requests, a UserDefaults (iOS) or SharedPreferences (Android) demo, sample feature flags, the deliberately broken accessibility controls for Scyther's audit, a SQLite database demo and a test crash.
 - **Location:** Scyther's spoofer state, the location the platform reports, a map of it and continuous updates.
-- **At launch:** it seeds the same environment variables, servers, feature flags, cookies, keychain items (iOS), preferences (Android) and database records, so every browser in the menu has data.
+- **At launch:** it sets the same environment variables, servers and feature flags as Scyther's example, and seeds cookies, keychain items (iOS), preferences (Android) and database records.
 
-The native half lives in the example's own Turbo Module, `HeracrossExampleDemo`. On iOS it's an app-local SPM module declared in `example/ios/react-native.config.js`, and on Android a package registered in `MainApplication`. Where ScytherExample has no Android equivalent, the Android side follows Scizor's sample app.
+The native half is the example's own Turbo Module, `HeracrossExampleDemo`. On iOS it's an app-local SPM module declared in `example/ios/react-native.config.js`; on Android it's a package registered in `MainApplication`. Where Scyther's example has no Android equivalent, the Android side follows Scizor's sample app.
 
-The port differs from ScytherExample where React Native can't do the same thing without third-party native libraries:
+It differs from Scyther's example where React Native can't do the same thing without third-party native libraries:
 
 - The map is drawn from OpenStreetMap tiles instead of MapKit.
 - Records are stored in SQLite instead of SwiftData.
@@ -372,55 +403,55 @@ heracross (JavaScript API)
     └── Android  HeracrossModule (Kotlin) → Scizor (JitPack)
 ```
 
-- **One spec, two implementations.** `src/NativeHeracross.ts` is the Turbo Module spec. Codegen turns it into an Objective-C++ protocol and a Java base class, so both platforms implement exactly the same surface.
-- **iOS is split in two targets.** SwiftPM cannot compile Swift and Objective-C++ in one target, so the Turbo Module is Objective-C++ and every call into Scyther goes through a small Swift target. Scyther's facade is `@MainActor`, so each call is forwarded to the main queue in the order JavaScript made it.
-- **Android forwards to Scizor** on the main thread, and hooks Scizor's interceptor into React Native's OkHttp client.
-- **The JavaScript layer does the shaping.** `src/index.tsx` validates input and turns every value into a string before it crosses the bridge, so native code on both sides stays simple.
+- **One spec, two implementations.** `src/NativeHeracross.ts` is the Turbo Module spec. Codegen turns it into an Objective-C++ protocol and a Java base class, so both platforms implement the same surface.
+- **iOS is split across two targets.** SwiftPM can't compile Swift and Objective-C++ in one target, so the Turbo Module is Objective-C++ and every call into Scyther goes through a small Swift target. Scyther's API runs on the main actor, so each call is forwarded to the main queue in the order JavaScript made it.
+- **Android forwards to Scizor** on the main thread, and hooks Scizor's interceptor into React Native's networking.
+- **The JavaScript layer normalises input.** `src/index.tsx` fills in defaults and converts server variables, environment variables and developer option values to strings before they reach native code.
 
 ## API Reference
 
 | Symbol | iOS (Scyther) | Android (Scizor) |
 |---|---|---|
-| `start({ allowProductionBuilds, captureNetwork })` | `Scyther.start(allowProductionBuilds:)` | `Scizor.start(app, allowProductionBuilds)` + OkHttp interceptor |
+| `start({ allowProductionBuilds, captureNetwork })` | `Scyther.start(allowProductionBuilds:)` | `Scizor.start(app, allowProductionBuilds)`, plus the networking hook |
 | `showMenu()` / `hideMenu()` | `showMenu()` / `hideMenu()` | `show()` / `dismiss()` |
-| `setInvocationGesture(gesture)` | `.shake` / `.custom` | `SHAKE` / `FLOATING_BUTTON` / `NONE` |
-| `featureFlags.register(flags)` | `register(_:remoteValue:)`, labelled by key | `register(FeatureFlag)` |
-| `featureFlags.isEnabled(key)` | `isEnabled(_:)` | `isEnabled(key)` |
-| `servers.configure(servers)` | `register(id:variables:)`, adds or replaces by id | `configure(environments)`, replaces the list |
-| `servers.select(id)` | `select(_:)` | `select(environment)` |
-| `servers.getSelected()` | `current` | `selected` |
+| `setInvocationGesture(gesture)` | `.shake`, or `.custom` for anything else | `SHAKE` / `FLOATING_BUTTON` / `NONE` |
+| `featureFlags.register(flags)` | `featureFlags.register(_:remoteValue:)`, listed by key | `featureFlags.register(FeatureFlag)`, listed by title |
+| `featureFlags.isEnabled(key)` | `featureFlags.isEnabled(_:)` | `featureFlags.isEnabled(key)` |
+| `servers.configure(servers)` | `servers.register(id:variables:)`, adds or replaces by id | `servers.configure(environments)`, replaces the list |
+| `servers.select(id)` | `servers.select(_:)` | `servers.select(environment)` |
+| `servers.getSelected()` | `servers.current` | `servers.selected` |
 | `setEnvironmentVariables(map)` | `environmentVariables` | `environmentVariables` |
 | `setDeveloperOptions(rows)` | `DeveloperOption(name:value:)` | `DeveloperOption.Value` |
 | `setApnsToken(token)` | `apnsToken` | no-op |
 | `setFcmToken(token)` | `fcmToken` | `fcmToken` |
-| `crashes.triggerTestCrash()` | `crashes.triggerTestCrash()` | throws on the main thread |
-| `location.getSpoofingState()` | `location.spoofingEnabled`, `spoofedLocation` | resolves `null` (Scizor keeps its spoofer internal) |
+| `crashes.triggerTestCrash()` | `crashes.triggerTestCrash()`, Debug builds only | throws on the main thread |
+| `location.getSpoofingState()` | `location.spoofingEnabled`, `spoofedLocation`, `CLLocationManager.isLocationSwizzled` | resolves `null` |
 
 ## FAQ
 
 ### Why is Heracross free?
 
-For the same reason Scyther and Scizor are: open source is what makes the world go round, and these tools exist to give back to the community.
+For the same reason Scyther and Scizor are: they exist to give back to the community.
 
 ### Why doesn't it support CocoaPods?
 
-Scyther is distributed through Swift Package Manager, and React Native is moving to it too. Supporting both would mean maintaining a podspec for a dependency that doesn't ship one.
+Scyther's supported installation is Swift Package Manager, and React Native 0.87 ships its own SPM integration, so Heracross is SPM only.
 
 ### Why do I need to patch React Native?
 
-React Native 0.87's SPM autolinker hardcodes iOS 15 on the package that links every library, and Scyther needs iOS 16. The patch changes that one number. It stops being necessary once React Native derives the version from your app.
+React Native 0.87's SPM autolinker hardcodes iOS 15 on the package that links every library, and Scyther needs iOS 16. The patch changes that one value. It stops being necessary once React Native derives the version from your app.
 
 ### Does it work with Expo?
 
-Not yet. It hasn't been tested with Expo, and Expo's iOS autolinking expects a podspec, which Heracross doesn't ship.
+No. Expo's iOS autolinking only discovers packages that ship a podspec, and an app-level `react-native.config.js` override doesn't change that. Heracross ships only a `Package.swift`.
 
 ### Will Heracross get my app rejected?
 
-Heracross adds no debugging behaviour of its own; it starts Scyther and Scizor, and both refuse to run in store builds by default. See [Scyther's FAQ](https://github.com/bstillitano/Scyther#faq) for iOS, and [what Scizor adds to your manifest](https://github.com/bstillitano/scizor#what-scizor-adds-to-your-manifest) for Android.
+Heracross only starts Scyther and Scizor, and both refuse to start in store builds unless you pass `allowProductionBuilds`. See [Scyther's FAQ](https://github.com/bstillitano/Scyther#faq) for iOS, and [what Scizor adds to your manifest](https://github.com/bstillitano/scizor#what-scizor-adds-to-your-manifest) for Android.
 
 ### What's the origin of the name?
 
-Named after the [Pokémon Heracross](https://pokemondb.net/pokedex/heracross), a Bug and Fighting type that stands alongside [Scyther](https://pokemondb.net/pokedex/scyther) and [Scizor](https://pokemondb.net/pokedex/scizor), with a horn made for flipping bugs out of your app.
+Named after the [Pokémon Heracross](https://pokemondb.net/pokedex/heracross), a Bug and Fighting type that uses its horn to fling foes, which sits alongside [Scyther](https://pokemondb.net/pokedex/scyther) and [Scizor](https://pokemondb.net/pokedex/scizor).
 
 ---
 
@@ -442,7 +473,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, how to run 
 
 ---
 
-## Security
+## Reporting a Vulnerability
 
 If you discover a security vulnerability, please email b.stillitano95@gmail.com directly. Do not open a public issue.
 

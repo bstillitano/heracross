@@ -21,8 +21,10 @@ export interface StartOptions {
    * Route React Native's own HTTP traffic (`fetch`, `XMLHttpRequest`) into the
    * network logger. Defaults to `true`.
    *
-   * On Android this installs an `OkHttpClientProvider` factory, which replaces
-   * any factory your app installed. On iOS Scyther intercepts `URLSession`
+   * On Android this registers a builder with React Native's networking module
+   * (`NetworkingModule.setCustomClientBuilder`), which it applies to every
+   * request sent after `start()`. It is a single slot, so it replaces any
+   * builder your app registered there. On iOS Scyther intercepts `URLSession`
    * traffic on its own and this option has no effect.
    */
   captureNetwork?: boolean;
@@ -54,7 +56,7 @@ export interface SelectedServer {
   variables: Record<string, string>;
 }
 
-/** A read-only key/value row in the menu's Developer section. */
+/** A read-only key/value row in the menu's Development Tools section. */
 export interface DeveloperOption {
   name: string;
   value: string;
@@ -123,7 +125,11 @@ export const Heracross = {
       }
     },
 
-    /** The flag's effective value: the local override if one is set, else its default. */
+    /**
+     * The flag's effective value: its local override when overrides are
+     * switched on in the menu and one is set, otherwise its default. Resolves
+     * `false` for a flag that was never registered.
+     */
     isEnabled(key: string): Promise<boolean> {
       return NativeHeracross.isFeatureFlagEnabled(key);
     },
@@ -158,7 +164,7 @@ export const Heracross = {
     NativeHeracross.setEnvironmentVariables(toStringMap(variables));
   },
 
-  /** Replaces the custom rows shown in the menu's Developer section. */
+  /** Replaces the custom rows shown in the menu's Development Tools section. */
   setDeveloperOptions(options: DeveloperOption[]): void {
     NativeHeracross.setDeveloperOptions(
       options.map(({ name, value }) => ({ name, value: String(value) }))
@@ -178,8 +184,10 @@ export const Heracross = {
   crashes: {
     /**
      * Crashes the app on purpose. Reopen it to find the crash in the menu's
-     * Crash Logs. On Android this throws on the main thread, which is what
-     * Scizor records.
+     * Crash Logs. On iOS this raises Scyther's test exception, which Scyther
+     * only compiles into Debug builds, so it does nothing in other
+     * configurations. On Android it throws on the main thread, which Scizor
+     * records.
      */
     triggerTestCrash(): void {
       NativeHeracross.triggerTestCrash();
