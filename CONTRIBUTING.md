@@ -25,7 +25,7 @@ The [example app](/example/) demonstrates usage of the library. You need to run 
 
 It is configured to use the local version of the library, so any changes you make to the library's source code will be reflected in the example app. Changes to the library's JavaScript code will be reflected in the example app without a rebuild, but native code changes will require a rebuild of the example app.
 
-If you want to use Android Studio or Xcode to edit the native code, you can open the `example/android` or `example/ios` directories respectively in those editors. To edit the Objective-C or Swift files, open `example/ios/HeracrossExample.xcworkspace` in Xcode and find the source files at `Pods > Development Pods > heracross`.
+If you want to use Android Studio or Xcode to edit the native code, you can open the `example/android` or `example/ios` directories respectively in those editors. To edit the Objective-C or Swift files, run `yarn example spm` once, then open `example/ios/HeracrossExample.xcodeproj` in Xcode and find the source files under `Package Dependencies > Heracross`. There is no Podfile: the library ships Swift Package Manager support only.
 
 To edit the Java or Kotlin files, open `example/android` in Android studio and find the source files at `heracross` under `Android`.
 
@@ -43,9 +43,10 @@ To run the example app on Android:
 yarn example android
 ```
 
-To run the example app on iOS:
+To run the example app on iOS, inject the Swift packages and open the project in Xcode:
 
 ```sh
+yarn example spm
 yarn example ios
 ```
 

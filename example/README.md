@@ -34,27 +34,15 @@ yarn android
 
 ### iOS
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+Heracross ships Swift Package Manager support only, so this example has no Podfile. The first time you clone, and every time you change native dependencies, inject React Native's Swift packages into the Xcode project:
 
 ```sh
-bundle install
+yarn spm
 ```
 
-Then, and every time you update your native dependencies, run:
+`react-native run-ios` locates the iOS project through a Podfile, so it cannot drive this project. Open it in Xcode instead and run the `HeracrossExample` scheme:
 
 ```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
 yarn ios
 ```
 

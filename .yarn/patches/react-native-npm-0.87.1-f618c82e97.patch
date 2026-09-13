@@ -1,0 +1,13 @@
+diff --git a/scripts/spm/generate-spm-autolinking.js b/scripts/spm/generate-spm-autolinking.js
+index b77decb60562de4a00a402686daebff01506c5da..8389fec55971ec362b845caddc6a103c0a785566 100644
+--- a/scripts/spm/generate-spm-autolinking.js
++++ b/scripts/spm/generate-spm-autolinking.js
+@@ -1069,7 +1069,7 @@ import Foundation
+ 
+ ${guardBlock}let package = Package(
+     name: "${AUTOLINKED_PACKAGE_NAME}",
+-    platforms: [.iOS(.v15)],
++    platforms: [.iOS(.v16)],
+     products: [
+         .library(name: "${AUTOLINKED_PACKAGE_NAME}", targets: ["AutolinkedAggregate"]),
+     ],

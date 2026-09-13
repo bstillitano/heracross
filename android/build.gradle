@@ -1,47 +1,27 @@
 buildscript {
-  ext.Heracross = [
-    kotlinVersion: "2.0.21",
-    minSdkVersion: 24,
-    compileSdkVersion: 36
-  ]
-
-  ext.getExtOrDefault = { prop ->
-    if (rootProject.ext.has(prop)) {
-      return rootProject.ext.get(prop)
-    }
-
-    return Heracross[prop]
-  }
-
-  repositories {
-    google()
-    mavenCentral()
-  }
-
-  dependencies {
-    classpath "com.android.tools.build:gradle:8.7.2"
-    // noinspection DifferentKotlinGradleVersion
-    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
+  ext.getExtOrDefault = { name, fallback ->
+    rootProject.ext.has(name) ? rootProject.ext.get(name) : fallback
   }
 }
-
 
 apply plugin: "com.android.library"
 
+// React Native 0.87 apps opt out of AGP 9's built-in Kotlin
+// (android.builtInKotlin=false); apply the plugin only when nothing has yet.
 if (project.extensions.findByName("kotlin") == null) {
   apply plugin: "kotlin-android"
 }
-
 
 apply plugin: "com.facebook.react"
 
 android {
   namespace "com.heracross"
 
-  compileSdkVersion getExtOrDefault("compileSdkVersion")
+  // Scizor is published from compileSdk 37 and cannot be consumed by less.
+  compileSdkVersion getExtOrDefault("compileSdkVersion", 37)
 
   defaultConfig {
-    minSdkVersion getExtOrDefault("minSdkVersion")
+    minSdkVersion getExtOrDefault("minSdkVersion", 24)
   }
 
   compileOptions {
@@ -52,4 +32,8 @@ android {
 
 dependencies {
   implementation "com.facebook.react:react-android"
+
+  // Resolved from JitPack, which the React Native Gradle plugin adds to every
+  // project by default (includeJitpackRepository=true).
+  implementation "com.github.bstillitano:scizor:v0.2.2"
 }

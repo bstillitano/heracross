@@ -84,3 +84,7 @@ android/generated
 
 # React Native Nitro Modules
 nitrogen/
+ios/.build/
+ios/.swiftpm/
+ios/Package.resolved
+example/ios/build/

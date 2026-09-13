@@ -1,0 +1,12 @@
+diff --git a/node_modules/react-native/scripts/spm/generate-spm-autolinking.js b/node_modules/react-native/scripts/spm/generate-spm-autolinking.js
+--- a/node_modules/react-native/scripts/spm/generate-spm-autolinking.js
++++ b/node_modules/react-native/scripts/spm/generate-spm-autolinking.js
+@@ -1069,7 +1069,7 @@
+ 
+ ${guardBlock}let package = Package(
+     name: "${AUTOLINKED_PACKAGE_NAME}",
+-    platforms: [.iOS(.v15)],
++    platforms: [.iOS(.v16)],
+     products: [
+         .library(name: "${AUTOLINKED_PACKAGE_NAME}", targets: ["AutolinkedAggregate"]),
+     ],
