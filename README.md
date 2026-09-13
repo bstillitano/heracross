@@ -1,6 +1,10 @@
 <a href="https://github.com/bstillitano/Scyther"><img src=".github/scyther-banner.svg" alt="Building a native iOS app? Get Scyther" width="100%" /></a>
 <a href="https://github.com/bstillitano/scizor"><img src=".github/scizor-banner.svg" alt="Building a native Android app? Get Scizor" width="100%" /></a>
 
+<p align="center">
+  <img width="200" src="Heracross.png" alt="Heracross">
+</p>
+
 # Heracross
 
 A React Native debugging toolkit that gives your app an in-app debug menu, one shake away, on both platforms. Heracross doesn't reimplement anything. It's a bridge to two native toolkits:
