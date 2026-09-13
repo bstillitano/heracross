@@ -2,6 +2,10 @@ import CoreLocation
 import Foundation
 import Scyther
 
+/// The variable Heracross stores a server's base URL under, since Scyther's
+/// `ServerConfiguration` has no field for it.
+private let baseUrlVariable = "baseUrl"
+
 /// The Objective-C face of Scyther that the `Heracross` Turbo Module calls.
 ///
 /// `Heracross.mm` declares a matching `@interface` by hand rather than importing
@@ -16,16 +20,24 @@ public final class HeracrossScyther: NSObject {
 
     // MARK: - Lifecycle
 
+    /// Starts Scyther once. `Scyther.start` isn't idempotent: calling it again
+    /// re-runs its setup, which swaps its `URLSessionConfiguration` hooks back
+    /// out and stops network logging.
     @objc(startAllowingProductionBuilds:)
     public static func start(allowProductionBuilds: Bool) {
-        onMain { Scyther.start(allowProductionBuilds: allowProductionBuilds) }
+        onMain {
+            guard !Scyther.isStarted else { return }
+            Scyther.start(allowProductionBuilds: allowProductionBuilds)
+        }
     }
 
+    /// Presents the menu from the top view controller.
     @objc(showMenu)
     public static func showMenu() {
         onMain { Scyther.showMenu() }
     }
 
+    /// Dismisses the menu if it is presented.
     @objc(hideMenu)
     public static func hideMenu() {
         onMain { Scyther.hideMenu() }
@@ -40,20 +52,47 @@ public final class HeracrossScyther: NSObject {
 
     // MARK: - Feature flags
 
+    /// Registers a flag, listed in the menu by its key, with its remote value.
     @objc(registerFeatureFlag:defaultValue:)
     public static func registerFeatureFlag(_ key: String, defaultValue: Bool) {
         onMain { Scyther.featureFlags.register(key, remoteValue: defaultValue) }
     }
 
+    /// Calls back with the flag's effective value.
     @objc(isFeatureFlagEnabled:completion:)
     public static func isFeatureFlagEnabled(_ key: String, completion: @escaping @Sendable (Bool) -> Void) {
         onMain { completion(Scyther.featureFlags.isEnabled(key)) }
     }
 
+    /// The menu's "Enable overrides" switch.
+    @objc(setFeatureFlagOverridesEnabled:)
+    public static func setFeatureFlagOverridesEnabled(_ enabled: Bool) {
+        onMain { Scyther.featureFlags.localOverridesEnabled = enabled }
+    }
+
+    /// Sets a registered flag's local override. Scyther ignores unregistered keys.
+    @objc(setFeatureFlagOverride:value:)
+    public static func setFeatureFlagOverride(_ key: String, value: Bool) {
+        onMain { Scyther.featureFlags.setLocalValue(value, for: key) }
+    }
+
+    /// Clears a flag's local override.
+    @objc(clearFeatureFlagOverride:)
+    public static func clearFeatureFlagOverride(_ key: String) {
+        onMain { Scyther.featureFlags.clearLocalValue(for: key) }
+    }
+
+    /// Clears every registered flag's local override.
+    @objc(resetFeatureFlagOverrides)
+    public static func resetFeatureFlagOverrides() {
+        onMain { Scyther.featureFlags.clearAllLocalValues() }
+    }
+
     // MARK: - Servers
 
-    /// Each element is `{ id, baseUrl, variables }`. A non-empty `baseUrl` is
-    /// registered as a `baseUrl` variable, since Scyther has no field for it.
+    /// Each element is `{ id, baseUrl, variables }`. Afterwards, if Scyther's
+    /// saved selection isn't a configured server, the first one is selected, so
+    /// iOS falls back the way Android does.
     @objc(configureServers:)
     public static func configureServers(_ servers: [[String: Any]]) {
         let entries = servers.compactMap(ServerEntry.init)
@@ -61,54 +100,100 @@ public final class HeracrossScyther: NSObject {
             for entry in entries {
                 await Scyther.servers.register(id: entry.id, variables: entry.variables)
             }
+            if await Scyther.servers.current == nil, let first = entries.first {
+                await Scyther.servers.select(first.id)
+            }
         }
     }
 
+    /// Selects a configured server. Unknown ids are ignored, as on Android;
+    /// Scyther itself would store them and leave no server selected.
     @objc(selectServer:)
     public static func selectServer(_ id: String) {
-        enqueueServerWork { await Scyther.servers.select(id) }
+        enqueueServerWork {
+            guard await Scyther.servers.all.contains(where: { $0.id == id }) else { return }
+            await Scyther.servers.select(id)
+        }
     }
 
-    /// Calls back with the selected server's id and variables, or a `nil` id
-    /// when nothing is selected.
+    /// Calls back with the selected server's id, base URL and variables (without
+    /// the stored `baseUrl` entry), or a `nil` id when none is configured.
     @objc(getSelectedServer:)
-    public static func getSelectedServer(_ completion: @escaping @Sendable (String?, [String: String]) -> Void) {
+    public static func getSelectedServer(
+        _ completion: @escaping @Sendable (String?, String, [String: String]) -> Void
+    ) {
         enqueueServerWork {
-            if let current = await Scyther.servers.current {
-                completion(current.id, current.variables)
-            } else {
-                completion(nil, [:])
+            guard let current = await Scyther.servers.current else {
+                completion(nil, "", [:])
+                return
             }
+            var variables = current.variables
+            let baseUrl = variables.removeValue(forKey: baseUrlVariable) ?? ""
+            completion(current.id, baseUrl, variables)
         }
     }
 
     // MARK: - Menu content
 
+    /// Replaces the Environment Variables screen's rows. Values that aren't
+    /// strings are skipped.
     @objc(setEnvironmentVariables:)
-    public static func setEnvironmentVariables(_ variables: [String: String]) {
-        onMain { Scyther.environmentVariables = variables }
+    public static func setEnvironmentVariables(_ variables: [String: Any]) {
+        let values = variables.compactMapValues { $0 as? String }
+        onMain { Scyther.environmentVariables = values }
     }
 
     /// Each element is `{ name, value }`, shown as a read-only value row.
     @objc(setDeveloperOptions:)
     public static func setDeveloperOptions(_ options: [[String: Any]]) {
-        let rows: [DeveloperValue] = options.compactMap { option in
+        let rows: [NameValue] = options.compactMap { option in
             guard let name = option["name"] as? String else { return nil }
-            return DeveloperValue(name: name, value: option["value"] as? String ?? "")
+            return NameValue(name: name, value: option["value"] as? String ?? "")
         }
         onMain {
             Scyther.developerOptions = rows.map { DeveloperOption(name: $0.name, value: $0.value) }
         }
     }
 
+    /// Each element is `{ name, url }`, shown in the Deep Link Tester.
+    @objc(setDeepLinkPresets:)
+    public static func setDeepLinkPresets(_ presets: [[String: Any]]) {
+        let links: [NameValue] = presets.compactMap { preset in
+            guard let name = preset["name"] as? String, let url = preset["url"] as? String else {
+                return nil
+            }
+            return NameValue(name: name, value: url)
+        }
+        onMain {
+            Scyther.deepLinks.presets = links.map { DeepLinkPreset(name: $0.name, url: $0.value) }
+        }
+    }
+
+    /// Sets the APNs token shown in the Notifications section.
     @objc(setApnsToken:)
     public static func setApnsToken(_ token: String?) {
         onMain { Scyther.apnsToken = token }
     }
 
+    /// Sets the FCM token shown in the Notifications section.
     @objc(setFcmToken:)
     public static func setFcmToken(_ token: String?) {
         onMain { Scyther.fcmToken = token }
+    }
+
+    /// Adds a JSON-compatible payload to the Notification Logger. It crosses to
+    /// the main actor as JSON data, since a dictionary of `Any` isn't `Sendable`.
+    @objc(logNotification:)
+    public static func logNotification(_ payload: [String: Any]) {
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload)
+        else { return }
+        onMain {
+            guard let userInfo = (try? JSONSerialization.jsonObject(with: data)) as? [AnyHashable: Any] else {
+                return
+            }
+            Scyther.notifications.logNotification(userInfo)
+        }
     }
 
     // MARK: - Crashes
@@ -163,22 +248,25 @@ public final class HeracrossScyther: NSObject {
     }
 }
 
+/// A server as sent from JavaScript. A non-empty `baseUrl` is stored as the
+/// `baseUrl` variable, replacing any variable of that name.
 private struct ServerEntry: Sendable {
     let id: String
     let variables: [String: String]
 
     init?(_ dictionary: [String: Any]) {
-        guard let id = dictionary["id"] as? String else { return nil }
-        var variables = dictionary["variables"] as? [String: String] ?? [:]
-        if let baseUrl = dictionary["baseUrl"] as? String, !baseUrl.isEmpty, variables["baseUrl"] == nil {
-            variables["baseUrl"] = baseUrl
+        guard let id = dictionary["id"] as? String, !id.isEmpty else { return nil }
+        var variables = (dictionary["variables"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+        variables.removeValue(forKey: baseUrlVariable)
+        if let baseUrl = dictionary["baseUrl"] as? String, !baseUrl.isEmpty {
+            variables[baseUrlVariable] = baseUrl
         }
         self.id = id
         self.variables = variables
     }
 }
 
-private struct DeveloperValue: Sendable {
+private struct NameValue: Sendable {
     let name: String
     let value: String
 }

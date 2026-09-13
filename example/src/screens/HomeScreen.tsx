@@ -62,7 +62,11 @@ function graphQL(operationName: string, query: string, variables: object) {
   });
 }
 
-export function HomeScreen() {
+function reportDatabaseError(error: unknown) {
+  console.warn('Could not reach the demo database', error);
+}
+
+export function HomeScreen({ active }: { active: boolean }) {
   const theme = useTheme();
   const [requestCount, setRequestCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,9 +77,12 @@ export function HomeScreen() {
     products: 0,
   });
 
+  // ContentView recounts the records every time the tab appears.
   useEffect(() => {
-    ExampleDemo.getRecordCounts().then(setCounts);
-  }, []);
+    if (active) {
+      ExampleDemo.getRecordCounts().then(setCounts).catch(reportDatabaseError);
+    }
+  }, [active]);
 
   const makeNetworkRequest = async () => {
     setIsLoading(true);
@@ -115,7 +122,7 @@ export function HomeScreen() {
       <Section header={`${toolkit.name} Demo`}>
         <ButtonRow
           title={`Open ${toolkit.name} Menu`}
-          onPress={Heracross.showMenu}
+          onPress={() => Heracross.showMenu()}
         />
         <ButtonRow title={toolkit.invocationHint} disabled />
       </Section>
@@ -160,16 +167,19 @@ export function HomeScreen() {
       <Section header={toolkit.defaultsSection}>
         <ButtonRow
           title="Write Sample Data"
-          onPress={ExampleDemo.writeSampleDefaults}
+          onPress={() => ExampleDemo.writeSampleDefaults()}
         />
         <ButtonRow
           title="Clear Sample Data"
-          onPress={ExampleDemo.clearSampleDefaults}
+          onPress={() => ExampleDemo.clearSampleDefaults()}
         />
       </Section>
 
       <Section header="Feature Flags Demo">
-        <ButtonRow title="Setup Sample Toggles" onPress={registerSampleToggles} />
+        <ButtonRow
+          title="Setup Sample Toggles"
+          onPress={() => registerSampleToggles()}
+        />
       </Section>
 
       {/* Scyther's accessibility audit is iOS only; Scizor has nothing to flag these with. */}
@@ -216,12 +226,20 @@ export function HomeScreen() {
       <Section header="Database Demo" footer={toolkit.databaseFooter}>
         <ButtonRow
           title="Add More Records"
-          onPress={() => ExampleDemo.addDemoRecords().then(setCounts)}
+          onPress={() =>
+            ExampleDemo.addDemoRecords()
+              .then(setCounts)
+              .catch(reportDatabaseError)
+          }
         />
         <ButtonRow
           title="Clear All Records"
           destructive
-          onPress={() => ExampleDemo.clearDemoRecords().then(setCounts)}
+          onPress={() =>
+            ExampleDemo.clearDemoRecords()
+              .then(setCounts)
+              .catch(reportDatabaseError)
+          }
         />
         <LabeledRow label="Users" value={String(counts.users)} />
         <LabeledRow label="Posts" value={String(counts.posts)} />
@@ -233,7 +251,7 @@ export function HomeScreen() {
           <ButtonRow
             title="Trigger Test Crash"
             destructive
-            onPress={Heracross.crashes.triggerTestCrash}
+            onPress={() => Heracross.crashes.triggerTestCrash()}
           />
         </Section>
       )}

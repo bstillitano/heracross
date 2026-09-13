@@ -19,10 +19,10 @@ export default function Root() {
         barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
       />
       <View style={[styles.fill, tab !== 'home' && styles.hidden]}>
-        <HomeScreen />
+        <HomeScreen active={tab === 'home'} />
       </View>
       <View style={[styles.fill, tab !== 'location' && styles.hidden]}>
-        <LocationScreen />
+        <LocationScreen active={tab === 'location'} />
       </View>
       <TabBar selected={tab} onSelect={setTab} />
     </SafeAreaProvider>

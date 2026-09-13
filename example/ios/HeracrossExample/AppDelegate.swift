@@ -3,6 +3,7 @@ import UserNotifications
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import Scyther
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,6 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     UNUserNotificationCenter.current().delegate = self
+    loadRocketSimConnect()
 
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
@@ -33,6 +35,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     )
 
     return true
+  }
+
+  // Remote notification payloads go to Scyther's Notification Logger, as in ScytherExample.
+  func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    Scyther.notifications.logNotification(userInfo)
+    completionHandler(.newData)
+  }
+
+  private func loadRocketSimConnect() {
+    #if DEBUG
+    guard Bundle(path: "/Applications/RocketSim.app/Contents/Frameworks/RocketSimConnectLinker.nocache.framework")?.load() == true else {
+      print("Failed to load linker framework")
+      return
+    }
+    print("RocketSim Connect successfully linked")
+    #endif
   }
 }
 

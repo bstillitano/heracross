@@ -13,14 +13,21 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)setInvocationGesture:(NSString *)gesture;
 + (void)registerFeatureFlag:(NSString *)key defaultValue:(BOOL)defaultValue;
 + (void)isFeatureFlagEnabled:(NSString *)key completion:(void (^)(BOOL enabled))completion;
++ (void)setFeatureFlagOverridesEnabled:(BOOL)enabled;
++ (void)setFeatureFlagOverride:(NSString *)key value:(BOOL)value;
++ (void)clearFeatureFlagOverride:(NSString *)key;
++ (void)resetFeatureFlagOverrides;
 + (void)configureServers:(NSArray<NSDictionary<NSString *, id> *> *)servers;
 + (void)selectServer:(NSString *)serverId;
 + (void)getSelectedServer:(void (^)(NSString *_Nullable serverId,
+                                    NSString *baseUrl,
                                     NSDictionary<NSString *, NSString *> *variables))completion;
-+ (void)setEnvironmentVariables:(NSDictionary<NSString *, NSString *> *)variables;
++ (void)setEnvironmentVariables:(NSDictionary<NSString *, id> *)variables;
 + (void)setDeveloperOptions:(NSArray<NSDictionary<NSString *, id> *> *)options;
++ (void)setDeepLinkPresets:(NSArray<NSDictionary<NSString *, id> *> *)presets;
 + (void)setApnsToken:(nullable NSString *)token;
 + (void)setFcmToken:(nullable NSString *)token;
++ (void)logNotification:(NSDictionary<NSString *, id> *)payload;
 + (void)triggerTestCrash;
 + (void)getLocationSpoofingState:(void (^)(BOOL enabled,
                                            BOOL swizzled,
@@ -78,6 +85,26 @@ NS_ASSUME_NONNULL_END
                               }];
 }
 
+- (void)setFeatureFlagOverridesEnabled:(BOOL)enabled
+{
+  [HeracrossScyther setFeatureFlagOverridesEnabled:enabled];
+}
+
+- (void)setFeatureFlagOverride:(NSString *)key value:(BOOL)value
+{
+  [HeracrossScyther setFeatureFlagOverride:key value:value];
+}
+
+- (void)clearFeatureFlagOverride:(NSString *)key
+{
+  [HeracrossScyther clearFeatureFlagOverride:key];
+}
+
+- (void)resetFeatureFlagOverrides
+{
+  [HeracrossScyther resetFeatureFlagOverrides];
+}
+
 - (void)configureServers:(NSArray *)servers
 {
   [HeracrossScyther configureServers:servers];
@@ -90,14 +117,16 @@ NS_ASSUME_NONNULL_END
 
 - (void)getSelectedServer:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
 {
-  [HeracrossScyther getSelectedServer:^(NSString *serverId, NSDictionary<NSString *, NSString *> *variables) {
+  [HeracrossScyther getSelectedServer:^(NSString *serverId,
+                                        NSString *baseUrl,
+                                        NSDictionary<NSString *, NSString *> *variables) {
     if (serverId == nil) {
       resolve([NSNull null]);
       return;
     }
     resolve(@{
       @"id" : serverId,
-      @"baseUrl" : variables[@"baseUrl"] ?: @"",
+      @"baseUrl" : baseUrl,
       @"variables" : variables,
     });
   }];
@@ -113,6 +142,11 @@ NS_ASSUME_NONNULL_END
   [HeracrossScyther setDeveloperOptions:options];
 }
 
+- (void)setDeepLinkPresets:(NSArray *)presets
+{
+  [HeracrossScyther setDeepLinkPresets:presets];
+}
+
 - (void)setApnsToken:(NSString *_Nullable)token
 {
   [HeracrossScyther setApnsToken:token];
@@ -121,6 +155,11 @@ NS_ASSUME_NONNULL_END
 - (void)setFcmToken:(NSString *_Nullable)token
 {
   [HeracrossScyther setFcmToken:token];
+}
+
+- (void)logNotification:(NSDictionary *)payload
+{
+  [HeracrossScyther logNotification:payload];
 }
 
 - (void)triggerTestCrash

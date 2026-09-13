@@ -7,6 +7,7 @@ import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 import java.util.HashMap
 
+/** Registers [HeracrossModule] as a Turbo Module. */
 class HeracrossPackage : BaseReactPackage() {
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
     return if (name == HeracrossModule.NAME) {

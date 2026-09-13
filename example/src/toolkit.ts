@@ -2,8 +2,9 @@ import { Platform } from 'react-native';
 
 /**
  * The copy that differs by platform: the toolkit's name and the paths to its
- * screens, which Scyther (iOS) and Scizor (Android) do not name identically.
- * iOS copy matches ScytherExample; Android copy matches Scizor's sample app.
+ * screens, which Scyther (iOS) and Scizor (Android) don't name identically.
+ * The iOS copy is ScytherExample's; the Android copy names Scizor's screens,
+ * using the wording of Scizor's sample app where it has the same section.
  */
 const ios = {
   name: 'Scyther',

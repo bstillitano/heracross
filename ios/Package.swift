@@ -18,7 +18,8 @@ let package = Package(
         .library(name: "Heracross", targets: ["Heracross"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/bstillitano/Scyther.git", from: "4.8.0"),
+        // 4.8.x only: Heracross uses Scyther API whose isolation a minor release could change.
+        .package(url: "https://github.com/bstillitano/Scyther.git", .upToNextMinor(from: "4.8.0")),
         .package(name: "ReactNative", path: "../../../../xcframeworks"),
         .package(name: "React-GeneratedCode", path: "../../../ios"),
     ],
@@ -43,7 +44,7 @@ let package = Package(
                 .product(name: "ReactAppHeaders", package: "React-GeneratedCode"),
             ],
             path: "Sources/Heracross",
-            // No public headers: the module is only reached through codegen.
+            // The sources contain no headers: the module is only reached through codegen.
             publicHeadersPath: ".",
             cxxSettings: [
                 // Match the prebuilt React.framework's NDEBUG-gated C++ ABI.

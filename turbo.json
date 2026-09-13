@@ -11,37 +11,46 @@
     "build:android": {
       "env": [
         "ANDROID_HOME",
+        "JAVA_HOME",
         "ORG_GRADLE_PROJECT_newArchEnabled"
       ],
       "inputs": [
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/yarn.lock",
+        "$TURBO_ROOT$/src/**",
+        "$TURBO_ROOT$/patches/**",
+        "$TURBO_ROOT$/.yarn/patches/**",
+        "$TURBO_ROOT$/android/**",
+        "!$TURBO_ROOT$/android/build/**",
         "package.json",
-        "android",
-        "!android/build",
-        "src/*.ts",
-        "src/*.tsx",
-        "example/package.json",
-        "example/android",
-        "!example/android/.gradle",
-        "!example/android/build",
-        "!example/android/app/build"
+        "src/native/**",
+        "android/**",
+        "!android/build/**",
+        "!android/.gradle/**",
+        "!android/app/build/**",
+        "!android/app/.cxx/**"
       ],
       "outputs": []
     },
     "build:ios": {
       "env": [
-        "RCT_NEW_ARCH_ENABLED",
-        "RCT_REMOVE_LEGACY_ARCH"
+        "DEVELOPER_DIR"
       ],
       "inputs": [
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/yarn.lock",
+        "$TURBO_ROOT$/src/**",
+        "$TURBO_ROOT$/patches/**",
+        "$TURBO_ROOT$/.yarn/patches/**",
+        "$TURBO_ROOT$/ios/**",
+        "!$TURBO_ROOT$/ios/.build/**",
+        "!$TURBO_ROOT$/ios/.swiftpm/**",
         "package.json",
-        "ios",
-        "src/*.ts",
-        "src/*.tsx",
-        "example/package.json",
-        "example/ios",
-        "!example/ios/build",
-        "!ios/.build",
-        "!ios/.swiftpm"
+        "react-native.config.js",
+        "scripts/**",
+        "src/native/**",
+        "ios/**",
+        "!ios/build/**"
       ],
       "outputs": []
     }

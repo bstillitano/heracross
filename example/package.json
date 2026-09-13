@@ -8,7 +8,8 @@
     "start": "react-native start",
     "build:android": "react-native build-android --extra-params \"--no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a\"",
     "build:ios": "cd ios && xcodebuild build -project HeracrossExample.xcodeproj -scheme HeracrossExample -configuration Debug -sdk iphonesimulator -destination \"generic/platform=iOS Simulator\" CODE_SIGNING_ALLOWED=NO",
-    "spm": "node node_modules/react-native/scripts/setup-apple-spm.js --yes --config-command \"[\\\"node\\\",\\\"scripts/react-native-config.js\\\"]\""
+    "spm": "node node_modules/react-native/scripts/setup-apple-spm.js --yes --config-command \"[\\\"node\\\",\\\"scripts/react-native-config.js\\\"]\"",
+    "build:ios:release": "cd ios && xcodebuild build -project HeracrossExample.xcodeproj -scheme HeracrossExample -configuration Release -sdk iphonesimulator -destination \"generic/platform=iOS Simulator\" CODE_SIGNING_ALLOWED=NO"
   },
   "dependencies": {
     "react": "19.2.3",

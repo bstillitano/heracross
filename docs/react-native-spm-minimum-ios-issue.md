@@ -25,6 +25,8 @@ but this target supports 15.0 (in target 'AutolinkedAggregate' from project 'Aut
 
 The library cannot work around this by declaring iOS 15 itself when its own dependencies require iOS 16. SwiftPM applies the same check on that edge.
 
+The same literal appears in two more places: the per-dependency packages the autolinker synthesizes for podspec-based libraries (`generate-spm-autolinking.js`, the second `platforms: [.iOS(.v15)]`) and the manifests `npx react-native spm scaffold` writes (`scaffold-package-swift.js`). A fix should cover all three.
+
 ### Steps to reproduce
 
 1. Create a React Native 0.87.1 app and migrate it to SPM with `npx react-native spm`.
@@ -45,7 +47,7 @@ Resolution fails with the error above.
 Derive the aggregate's minimum from something other than a literal, for example (in order of preference):
 
 1. The highest `.iOS(...)` declared by an autolinked self-managed package. SwiftPM needs the aggregate to be at least that, and the app target must already be at least that to link the library.
-2. The app target's `IPHONEOS_DEPLOYMENT_TARGET`, which the injector already reads the `.xcodeproj` for.
+2. The app target's `IPHONEOS_DEPLOYMENT_TARGET`, read from the `.xcodeproj` the injector already edits.
 3. An explicit `spm.minimumIosVersion` in the app's `react-native.config.js`.
 
 ### Workaround

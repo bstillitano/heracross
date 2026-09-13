@@ -25,9 +25,10 @@ The [example app](/example/) demonstrates usage of the library. You need to run 
 
 It is configured to use the local version of the library, so any changes you make to the library's source code will be reflected in the example app. Changes to the library's JavaScript code will be reflected in the example app without a rebuild, but native code changes will require a rebuild of the example app.
 
-If you want to use Android Studio or Xcode to edit the native code, you can open the `example/android` or `example/ios` directories respectively in those editors. To edit the Objective-C or Swift files, run `yarn example spm` once, then open `example/ios/HeracrossExample.xcodeproj` in Xcode and find the source files under `Package Dependencies > Heracross`. There is no Podfile: the library ships Swift Package Manager support only.
+To edit the native code:
 
-To edit the Java or Kotlin files, open `example/android` in Android studio and find the source files at `heracross` under `Android`.
+- **iOS:** run `yarn example spm` once, then open `example/ios/HeracrossExample.xcodeproj` in Xcode and find the library's Swift and Objective-C++ sources under `Package Dependencies` → `Heracross`. There is no Podfile: the library ships Swift Package Manager support only.
+- **Android:** open `example/android` in Android Studio and find the library's Kotlin sources under `heracross` → `java/com/heracross`.
 
 You can use various commands from the root directory to work with the project.
 
@@ -43,7 +44,7 @@ To run the example app on Android:
 yarn example android
 ```
 
-To run the example app on iOS, inject the Swift packages and open the project in Xcode:
+To run the example app on iOS, inject the Swift packages, open the project in Xcode, and run the `HeracrossExample` scheme:
 
 ```sh
 yarn example spm
@@ -70,19 +71,23 @@ Remember to add tests for your change if possible. Run the unit tests by:
 yarn test
 ```
 
-
+The React Native patch exists twice: `.yarn/patches/` for this repository and `patches/` for apps that use patch-package. Keep the two in step when you change it.
 
 ### Scripts
 
-The `package.json` file contains various scripts for common tasks:
+The root `package.json` contains scripts for common tasks:
 
-- `yarn`: setup project by installing dependencies.
-- `yarn typecheck`: type-check files with TypeScript.
-    - `yarn test`: run unit tests with [Jest](https://jestjs.io/).
-  - `yarn example start`: start the Metro server for the example app.
-- `yarn example android`: run the example app on Android.
-- `yarn example ios`: run the example app on iOS.
-  
+- `yarn`: set up the project by installing dependencies.
+- `yarn typecheck`: type-check the library and the example with TypeScript.
+- `yarn test`: run the unit tests with [Jest](https://jestjs.io/).
+- `yarn prepare`: build the library into `lib/` with react-native-builder-bob.
+- `yarn clean`: delete build output.
+- `yarn example start`: start the Metro server for the example app.
+- `yarn example android`: build and run the example app on Android.
+- `yarn example spm`: inject React Native's Swift packages into the example's Xcode project.
+- `yarn example ios`: open the example's Xcode project.
+- `yarn example build:android`, `yarn example build:ios` and `yarn example build:ios:release`: build the example app without running it.
+
 ### Sending a pull request
 
 > **Working on your first pull request?** You can learn how from this _free_ series: [How to Contribute to an Open Source Project on GitHub](https://app.egghead.io/playlists/how-to-contribute-to-an-open-source-project-on-github).
@@ -90,7 +95,6 @@ The `package.json` file contains various scripts for common tasks:
 When you're sending a pull request:
 
 - Prefer small pull requests focused on one change.
-- Verify that linters and tests are passing.
+- Verify that `yarn typecheck` and `yarn test` pass, and that the example app builds on both platforms.
 - Review the documentation to make sure it looks good.
-- Follow the pull request template when opening a pull request.
 - For pull requests that change the API or implementation, discuss with maintainers first by opening an issue.

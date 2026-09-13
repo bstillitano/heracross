@@ -20,7 +20,9 @@ export function SafeAreaProvider({ children }: { children: ReactNode }) {
   const [insets, setInsets] = useState(noInsets);
 
   const refresh = useCallback(() => {
-    ExampleDemo.getSafeAreaInsets().then(setInsets);
+    ExampleDemo.getSafeAreaInsets()
+      .then(setInsets)
+      .catch(() => {});
   }, []);
 
   useEffect(refresh, [refresh]);

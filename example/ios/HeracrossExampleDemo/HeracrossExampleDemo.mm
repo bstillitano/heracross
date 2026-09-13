@@ -65,7 +65,7 @@ static int CountRows(sqlite3 *db, const char *table)
   return count;
 }
 
-/// Runs one parameterised insert, returning the new row id.
+/// Runs one parameterised insert, returning the new row id, or 0 if it failed.
 static sqlite3_int64 Insert(sqlite3 *db, const char *sql, NSArray *values)
 {
   sqlite3_stmt *statement = NULL;
@@ -82,9 +82,9 @@ static sqlite3_int64 Insert(sqlite3 *db, const char *sql, NSArray *values)
       sqlite3_bind_int64(statement, position, [value longLongValue]);
     }
   }];
-  sqlite3_step(statement);
+  int result = sqlite3_step(statement);
   sqlite3_finalize(statement);
-  return sqlite3_last_insert_rowid(db);
+  return result == SQLITE_DONE ? sqlite3_last_insert_rowid(db) : 0;
 }
 
 static NSDictionary *RecordCounts(sqlite3 *db)
@@ -187,7 +187,9 @@ static int RandomBetween(int lower, int upper)
 
 - (void)seedKeychainItems
 {
-  [self saveToKeychainService:@"com.example.scyther" account:@"api_key" data:@"sk_live_1234567890abcdef"];
+  // ScytherExample stores "sk_live_1234567890abcdef", which secret scanners
+  // mistake for a Stripe key; this demo value can't be.
+  [self saveToKeychainService:@"com.example.scyther" account:@"api_key" data:@"demo_api_key_1234567890abcdef"];
   [self saveToKeychainService:@"com.example.scyther"
                       account:@"access_token"
                          data:@"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"];
@@ -265,6 +267,9 @@ static int RandomBetween(int lower, int upper)
   ];
   for (NSArray *post in posts) {
     NSNumber *userId = userIds[[post[2] unsignedIntegerValue]];
+    if (userId.longLongValue == 0) {
+      continue;
+    }
     Insert(db,
            "INSERT INTO posts (title, content, publishedAt, userId) VALUES (?, ?, ?, ?)",
            @[ post[0], post[1], Now(), userId ]);
@@ -351,14 +356,16 @@ static int RandomBetween(int lower, int upper)
                                   @(RandomBetween(18, 65)),
                                   Now(),
                                 ]);
-  Insert(db,
-         "INSERT INTO posts (title, content, publishedAt, userId) VALUES (?, ?, ?, ?)",
-         @[
-           [NSString stringWithFormat:@"Post %d", RandomBetween(1000, 9999)],
-           @"This is a randomly generated post for testing purposes.",
-           Now(),
-           @(userId),
-         ]);
+  if (userId != 0) {
+    Insert(db,
+           "INSERT INTO posts (title, content, publishedAt, userId) VALUES (?, ?, ?, ?)",
+           @[
+             [NSString stringWithFormat:@"Post %d", RandomBetween(1000, 9999)],
+             @"This is a randomly generated post for testing purposes.",
+             Now(),
+             @(userId),
+           ]);
+  }
   NSArray *categories = @[ @"Electronics", @"Audio", @"Accessories", @"Wearables", @"Software" ];
   Insert(db,
          "INSERT INTO products (name, price, inStock, category) VALUES (?, ?, ?, ?)",
@@ -479,7 +486,7 @@ static NSString *AuthorizationName(CLAuthorizationStatus status)
       }
     }
   }
-  UIEdgeInsets insets = window.safeAreaInsets;
+  UIEdgeInsets insets = window != nil ? window.safeAreaInsets : UIEdgeInsetsZero;
   resolve(@{
     @"top" : @(insets.top),
     @"bottom" : @(insets.bottom),
