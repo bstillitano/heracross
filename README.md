@@ -163,7 +163,13 @@ Scizor depends on Material 3 `1.5.0-alpha`, which ends up in your app. Read [Sci
 
 ## Installation
 
-Heracross isn't published to npm yet.
+Heracross isn't published to npm yet. Install it from GitHub, which builds the package on install:
+
+```sh
+npm install github:bstillitano/heracross
+```
+
+While the repository is private, only accounts with access to it can install it.
 
 ### Android
 
