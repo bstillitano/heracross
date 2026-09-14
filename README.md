@@ -480,7 +480,7 @@ A spoofed location reaches the app through `LocationManager`.
 Heracross covers what both toolkits share. Everything else, such as custom screens, interface previews or database adapters, is configured natively. On Android, add Scizor to your app module, at the version Heracross uses, to call it directly:
 
 ```groovy
-implementation "com.github.bstillitano:scizor:v0.2.2"
+implementation "com.github.bstillitano:scizor:v0.2.3"
 ```
 
 ## Permissions & Platform Setup
@@ -699,8 +699,8 @@ All of these are exported from `heracross`:
 | Component | Version |
 |---|---|
 | Heracross | 0.1.0, not yet published to npm |
-| Scyther (iOS) | 4.8.x, resolved by Swift Package Manager |
-| Scizor (Android) | v0.2.2, from JitPack |
+| Scyther (iOS) | 4.8.1 or a later 4.8.x, resolved by Swift Package Manager |
+| Scizor (Android) | v0.2.3, from JitPack |
 | OkHttp `okhttp-urlconnection` (Android) | 5.4.0, aligned with Scizor |
 | React Native (peer dependency) | 0.87.x |
 

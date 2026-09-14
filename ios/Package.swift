@@ -65,7 +65,8 @@ let package = Package(
         : [.library(name: "Heracross", targets: ["Heracross"])],
     dependencies: [
         // 4.8.x only: Heracross uses Scyther API whose isolation a minor release could change.
-        .package(url: "https://github.com/bstillitano/Scyther.git", .upToNextMinor(from: "4.8.0")),
+        // 4.8.1 or later, where a second `Scyther.start` call is ignored.
+        .package(url: "https://github.com/bstillitano/Scyther.git", .upToNextMinor(from: "4.8.1")),
     ] + (testing ? [] : [
         .package(name: "ReactNative", path: "../../../../xcframeworks"),
         .package(name: "React-GeneratedCode", path: "../../../ios"),

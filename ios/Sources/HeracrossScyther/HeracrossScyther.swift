@@ -16,15 +16,11 @@ public final class HeracrossScyther: NSObject {
 
     // MARK: - Lifecycle
 
-    /// Starts Scyther once. `Scyther.start` isn't idempotent: calling it again
-    /// re-runs its setup, which swaps its `URLSessionConfiguration` hooks back
-    /// out and stops network logging.
+    /// Starts Scyther. Since 4.8.1, the minimum Heracross resolves, Scyther
+    /// ignores every call after the one that started it.
     @objc(startAllowingProductionBuilds:)
     public static func start(allowProductionBuilds: Bool) {
-        onMain {
-            guard !Scyther.isStarted else { return }
-            Scyther.start(allowProductionBuilds: allowProductionBuilds)
-        }
+        onMain { Scyther.start(allowProductionBuilds: allowProductionBuilds) }
     }
 
     /// Calls back with whether Scyther has started. It runs after any `start`
