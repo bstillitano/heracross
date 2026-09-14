@@ -183,7 +183,7 @@ Heracross isn't published to npm yet. Install it from GitHub, which builds the p
 npm install github:bstillitano/heracross
 ```
 
-While the repository is private, only accounts with access to it can install it. npm records the dependency with an SSH URL in `package-lock.json`, so machines that run `npm ci`, such as CI, need SSH access to the repository too.
+npm records the dependency with a `git+ssh` URL in `package-lock.json`, but installs fetch the repository over HTTPS, so machines that run `npm ci`, such as CI, don't need SSH access to GitHub.
 
 ### Android
 
