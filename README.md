@@ -180,8 +180,10 @@ Two dependency notes for Android:
 Heracross isn't published to npm yet. Install it from GitHub, which builds the package on install:
 
 ```sh
-npm install github:bstillitano/heracross
+npm install github:bstillitano/heracross#v0.1.0
 ```
+
+`#v0.1.0` pins the release. Leave it off to track unreleased changes on `main`.
 
 npm records the dependency with a `git+ssh` URL in `package-lock.json`, but installs fetch the repository over HTTPS, so machines that run `npm ci`, such as CI, don't need SSH access to GitHub.
 
@@ -698,7 +700,7 @@ All of these are exported from `heracross`:
 
 | Component | Version |
 |---|---|
-| Heracross | 0.1.0, not yet published to npm |
+| Heracross | 0.1.0, installed from GitHub; not published to npm |
 | Scyther (iOS) | 4.8.1 or a later 4.8.x, resolved by Swift Package Manager |
 | Scizor (Android) | v0.2.3, from JitPack |
 | OkHttp `okhttp-urlconnection` (Android) | 5.4.0, aligned with Scizor |
