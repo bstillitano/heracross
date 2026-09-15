@@ -2,7 +2,7 @@
 
 Heracross is released on GitHub. Install a release by its tag: `npm install github:bstillitano/heracross#vX.Y.Z`.
 
-## Unreleased
+## v0.2.0
 
 ### Added
 

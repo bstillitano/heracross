@@ -1,6 +1,6 @@
 {
   "name": "heracross",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "React Native bridge for the Scyther (iOS) and Scizor (Android) debugging toolkits",
   "main": "./lib/module/index.js",

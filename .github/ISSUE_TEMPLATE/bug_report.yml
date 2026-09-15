@@ -36,7 +36,7 @@ body:
     attributes:
       label: Library version
       description: The release tag or commit you installed, from the `github:bstillitano/heracross#...` entry in your package.json.
-      placeholder: "v0.1.0"
+      placeholder: "v0.2.0"
     validations:
       required: true
   - type: dropdown
