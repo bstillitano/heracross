@@ -5,15 +5,23 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Implemented in Swift by the HeracrossScyther target. Declared here by hand
 // rather than through `@import HeracrossScyther`, which would need C++ modules
-// enabled across React's headers. Keep in sync with HeracrossScyther.swift.
+// enabled across React's headers. Keep in sync with HeracrossScyther.swift;
+// SelectorContractTests checks every selector below exists there.
 @interface HeracrossScyther : NSObject
 + (void)startAllowingProductionBuilds:(BOOL)allowProductionBuilds;
 + (void)isStarted:(void (^)(BOOL started))completion;
 + (void)showMenu;
 + (void)hideMenu;
++ (void)isMenuOpen:(void (^)(BOOL open))completion;
 + (void)setInvocationGesture:(NSString *)gesture;
 + (void)registerFeatureFlag:(NSString *)key defaultValue:(BOOL)defaultValue;
 + (void)isFeatureFlagEnabled:(NSString *)key completion:(void (^)(BOOL enabled))completion;
++ (void)getFeatureFlags:(void (^)(NSArray<NSString *> *keys,
+                                  NSArray<NSNumber *> *defaultValues,
+                                  NSArray<NSNumber *> *enabled,
+                                  NSArray<NSNumber *> *overrides))completion;
++ (void)getFeatureFlagOverride:(NSString *)key completion:(void (^)(BOOL hasOverride, BOOL value))completion;
++ (void)getFeatureFlagOverridesEnabled:(void (^)(BOOL enabled))completion;
 + (void)setFeatureFlagOverridesEnabled:(BOOL)enabled;
 + (void)setFeatureFlagOverride:(NSString *)key value:(BOOL)value;
 + (void)clearFeatureFlagOverride:(NSString *)key;
@@ -23,11 +31,15 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)getSelectedServer:(void (^)(NSString *_Nullable serverId,
                                     NSString *baseUrl,
                                     NSDictionary<NSString *, NSString *> *variables))completion;
++ (void)getServers:(void (^)(NSArray<NSString *> *ids,
+                             NSArray<NSString *> *baseUrls,
+                             NSArray<NSDictionary<NSString *, NSString *> *> *variables))completion;
 + (void)setFeatureFlagChangeHandler:(void (^)(NSString *key, BOOL enabled))featureFlagHandler
                 serverChangeHandler:(void (^)(NSString *serverId,
                                               NSString *baseUrl,
                                               NSDictionary<NSString *, NSString *> *variables))serverHandler;
 + (void)setEnvironmentVariables:(NSDictionary<NSString *, id> *)variables;
++ (void)getEnvironmentVariables:(void (^)(NSDictionary<NSString *, NSString *> *variables))completion;
 + (void)setDeveloperOptions:(NSArray<NSDictionary<NSString *, id> *> *)options;
 + (void)setDeepLinkPresets:(NSArray<NSDictionary<NSString *, id> *> *)presets;
 + (void)setApnsToken:(nullable NSString *)token;
@@ -42,6 +54,9 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 NS_ASSUME_NONNULL_END
+
+// Matches OverrideState in HeracrossModels.swift.
+static const NSInteger HeracrossNoOverride = -1;
 
 @interface Heracross : NativeHeracrossSpecBase <NativeHeracrossSpec>
 @end
@@ -98,6 +113,13 @@ NS_ASSUME_NONNULL_END
   [HeracrossScyther hideMenu];
 }
 
+- (void)isMenuOpen:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
+{
+  [HeracrossScyther isMenuOpen:^(BOOL open) {
+    resolve(@(open));
+  }];
+}
+
 - (void)setInvocationGesture:(NSString *)gesture
 {
   [HeracrossScyther setInvocationGesture:gesture];
@@ -122,6 +144,44 @@ NS_ASSUME_NONNULL_END
                               completion:^(BOOL enabled) {
                                 resolve(@(enabled));
                               }];
+}
+
+- (void)getFeatureFlags:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
+{
+  [HeracrossScyther getFeatureFlags:^(NSArray<NSString *> *keys,
+                                      NSArray<NSNumber *> *defaultValues,
+                                      NSArray<NSNumber *> *enabled,
+                                      NSArray<NSNumber *> *overrides) {
+    NSMutableArray *flags = [NSMutableArray arrayWithCapacity:keys.count];
+    for (NSUInteger index = 0; index < keys.count; index++) {
+      NSInteger override = overrides[index].integerValue;
+      [flags addObject:@{
+        @"key" : keys[index],
+        @"title" : keys[index],
+        @"defaultValue" : defaultValues[index],
+        @"enabled" : enabled[index],
+        @"override" : override == HeracrossNoOverride ? (id)[NSNull null] : @(override == 1),
+      }];
+    }
+    resolve(flags);
+  }];
+}
+
+- (void)getFeatureFlagOverride:(NSString *)key
+                       resolve:(RCTPromiseResolveBlock)resolve
+                        reject:(RCTPromiseRejectBlock)reject
+{
+  [HeracrossScyther getFeatureFlagOverride:key
+                                completion:^(BOOL hasOverride, BOOL value) {
+                                  resolve(hasOverride ? @(value) : (id)[NSNull null]);
+                                }];
+}
+
+- (void)getFeatureFlagOverridesEnabled:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
+{
+  [HeracrossScyther getFeatureFlagOverridesEnabled:^(BOOL enabled) {
+    resolve(@(enabled));
+  }];
 }
 
 - (void)setFeatureFlagOverridesEnabled:(BOOL)enabled
@@ -171,9 +231,33 @@ NS_ASSUME_NONNULL_END
   }];
 }
 
+- (void)getServers:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
+{
+  [HeracrossScyther getServers:^(NSArray<NSString *> *ids,
+                                 NSArray<NSString *> *baseUrls,
+                                 NSArray<NSDictionary<NSString *, NSString *> *> *variables) {
+    NSMutableArray *servers = [NSMutableArray arrayWithCapacity:ids.count];
+    for (NSUInteger index = 0; index < ids.count; index++) {
+      [servers addObject:@{
+        @"id" : ids[index],
+        @"baseUrl" : baseUrls[index],
+        @"variables" : variables[index],
+      }];
+    }
+    resolve(servers);
+  }];
+}
+
 - (void)setEnvironmentVariables:(NSDictionary *)variables
 {
   [HeracrossScyther setEnvironmentVariables:variables];
+}
+
+- (void)getEnvironmentVariables:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
+{
+  [HeracrossScyther getEnvironmentVariables:^(NSDictionary<NSString *, NSString *> *variables) {
+    resolve(variables);
+  }];
 }
 
 - (void)setDeveloperOptions:(NSArray *)options

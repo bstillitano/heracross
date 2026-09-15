@@ -8,7 +8,7 @@ internal data class FlagChange(val key: String, val enabled: Boolean)
  * registered flag's effective value.
  */
 internal class FlagChangeTracker {
-  private var last: Map<String, Boolean> = emptyMap()
+  private var last: MutableMap<String, Boolean> = mutableMapOf()
 
   /**
    * Records [current] and returns the flags in both it and the previous
@@ -20,8 +20,17 @@ internal class FlagChangeTracker {
       .filter { (key, value) -> last[key]?.let { it != value } ?: false }
       .toSortedMap()
       .map { (key, value) -> FlagChange(key, value) }
-    last = current
+    last = current.toMutableMap()
     return changes
+  }
+
+  /**
+   * Records a flag's value when it hasn't been seen, so the next snapshot
+   * compares with it. A change made straight after registering a flag is then
+   * reported instead of becoming the flag's first value.
+   */
+  fun recordIfUnseen(key: String, enabled: Boolean) {
+    if (key !in last) last[key] = enabled
   }
 }
 
@@ -38,5 +47,13 @@ internal class SelectionTracker {
     val previous = last
     last = current
     return current.takeIf { previous != null && previous != it }
+  }
+
+  /**
+   * Records [current] when nothing has been recorded yet, so a change made
+   * straight after it is reported instead of becoming the first value.
+   */
+  fun recordIfUnseen(current: String?) {
+    if (last == null) last = current
   }
 }

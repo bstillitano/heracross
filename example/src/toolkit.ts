@@ -8,7 +8,11 @@ import { Platform } from 'react-native';
  */
 const ios = {
   name: 'Scyther',
-  invocationHint: 'Shake device to open menu',
+  // In a debug build React Native's Dev Menu takes the shake from Scyther, so
+  // ScytherExample's hint would be wrong there. Release builds keep it.
+  invocationHint: __DEV__
+    ? 'Debug build: shake opens the Dev Menu, so use the button above'
+    : 'Shake device to open menu',
   defaultsSection: 'User Defaults Demo',
   graphQLFooter:
     'Calls https://graphqlzero.almansi.me. Open Scyther → Networking → Network Logs to see the operation name and type.',

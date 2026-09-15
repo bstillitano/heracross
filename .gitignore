@@ -70,3 +70,6 @@ example/ios/build/
 
 # Jest
 coverage/
+
+# npm pack
+*.tgz

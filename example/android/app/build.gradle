@@ -111,6 +111,13 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // Only for Scizor.wrapAppearance in MainActivity, as Scizor's sample app uses it.
+    // Heracross depends on Scizor with `implementation`, so Scizor's classes aren't on
+    // this app's compile classpath without it. Keep the version in step with
+    // android/build.gradle at the repository root. Resolved from JitPack, which the
+    // React Native Gradle plugin adds by default.
+    implementation("com.github.bstillitano:scizor:v0.2.3")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

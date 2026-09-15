@@ -1,0 +1,45 @@
+name: 💡 Feature request
+description: Suggest a new feature or an improvement to this library.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Feature request
+
+        Heracross bridges the [Scyther](https://github.com/bstillitano/Scyther) (iOS) and [Scizor](https://github.com/bstillitano/scizor) (Android) toolkits. If what you want is a new tool inside Scyther or Scizor rather than a way to reach it from React Native, it may belong in that repository instead.
+  - type: checkboxes
+    attributes:
+      label: Before submitting a new issue
+      options:
+        - label: I checked for existing issues asking for the same thing.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What would you like Heracross to do? An example of the JavaScript API you have in mind helps.
+    validations:
+      required: true
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms
+      options:
+        - iOS and Android
+        - iOS only
+        - Android only
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Any workaround you use now, or other approaches you considered.

@@ -26,9 +26,11 @@ import kotlin.random.Random
  * The example app's demo data on Android, ported from ScytherExample
  * (`ScytherExampleApp.swift`, `ContentView.swift`, `LocationTestView.swift`):
  * UserDefaults-style preferences and a SQLite database with the same records,
- * for Scizor's browsers, and `LocationManager` for the Location tab. The
- * example's cookies are logged from JavaScript, in `src/setup.ts`. Where
- * ScytherExample has nothing to port, it follows Scizor's sample app.
+ * for Scizor's browsers, and `LocationManager` for the Location tab. Where
+ * ScytherExample has nothing to port, it follows Scizor's sample app
+ * (`SampleApp.kt`), whose `user_prefs` and `app_settings` SharedPreferences it
+ * seeds at launch. The example's cookies, FCM token, deep link presets and
+ * developer options are set from JavaScript, in `src/setup.ts`.
  */
 class HeracrossExampleDemoModule(reactContext: ReactApplicationContext) :
   NativeHeracrossExampleDemoSpec(reactContext) {
@@ -52,7 +54,26 @@ class HeracrossExampleDemoModule(reactContext: ReactApplicationContext) :
   // Launch data
 
   override fun seedDemoData() {
+    runCatching { seedPreferences() }
     runCatching { seedDatabase() }
+  }
+
+  /** The SharedPreferences values Scizor's sample writes in `SampleApp.seedDemoPreferences`. */
+  private fun seedPreferences() {
+    context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE).edit()
+      .putString("username", "brandon")
+      .putString("email", "brandon@example.com")
+      .putBoolean("onboarding_complete", true)
+      .putBoolean("push_enabled", false)
+      .putInt("launch_count", 7)
+      .putLong("last_sync_ms", 1_721_000_000_000L)
+      .putFloat("cart_total", 42.5f)
+      .apply()
+
+    context.getSharedPreferences("app_settings", Context.MODE_PRIVATE).edit()
+      .putString("theme", "system")
+      .putBoolean("analytics_opt_in", true)
+      .apply()
   }
 
   // Preferences Demo, the equivalent of ContentView's UserDefaults.standard writes
@@ -236,7 +257,42 @@ class HeracrossExampleDemoModule(reactContext: ReactApplicationContext) :
     granted(Manifest.permission.ACCESS_FINE_LOCATION) || granted(Manifest.permission.ACCESS_COARSE_LOCATION)
 
   override fun getLocationAuthorization(promise: Promise) {
-    promise.resolve(if (hasLocationPermission()) "authorized" else "notDetermined")
+    promise.resolve(locationAuthorization())
+  }
+
+  /** The example's own bookkeeping, kept apart from the preferences it seeds for Scizor's browser. */
+  private val demoState
+    get() = context.getSharedPreferences(STATE_PREFERENCES, Context.MODE_PRIVATE)
+
+  /**
+   * Whether the system would show a rationale for location, which it does once
+   * the user has refused a request but can still be asked. `null` without a
+   * current activity, where there's no way to tell.
+   */
+  private fun locationRationale(): Boolean? {
+    val activity = reactApplicationContext.currentActivity ?: return null
+    return LOCATION_PERMISSIONS.any(activity::shouldShowRequestPermissionRationale)
+  }
+
+  /**
+   * Android has no "not determined" status, so it is inferred. `notDetermined`
+   * means a request would show the system dialog: the user has never refused
+   * one, or has refused but can still be asked (the system wants a rationale).
+   * `denied` means the user has refused before and no rationale is wanted, so
+   * they chose not to be asked again and a request returns without a dialog.
+   *
+   * "Has refused before" is recorded in [demoState], and only when a refusal
+   * leaves a rationale to show. Dismissing the dialog leaves none, so it isn't
+   * recorded and can't read as `denied`. On first launch nothing is recorded,
+   * so the status is `notDetermined`; after a first refusal a request can
+   * still show the dialog, so it stays `notDetermined` until the user refuses
+   * for good.
+   */
+  private fun locationAuthorization(): String {
+    if (hasLocationPermission()) return "authorized"
+    val refusedBefore = demoState.getBoolean(KEY_LOCATION_REFUSED, false)
+    val canAskAgain = locationRationale() ?: true
+    return if (!refusedBefore || canAskAgain) "notDetermined" else "denied"
   }
 
   /**
@@ -248,16 +304,15 @@ class HeracrossExampleDemoModule(reactContext: ReactApplicationContext) :
     val activity = reactApplicationContext.currentActivity as? PermissionAwareActivity ?: return
     val listener = PermissionListener { _, _, grantResults ->
       val granted = grantResults.any { it == PackageManager.PERMISSION_GRANTED }
-      emitOnLocationAuthorizationChange(if (granted) "authorized" else "denied")
+      if (!granted && locationRationale() == true) {
+        demoState.edit().putBoolean(KEY_LOCATION_REFUSED, true).apply()
+      }
+      emitOnLocationAuthorizationChange(locationAuthorization())
       if (granted) requestLocation()
       true
     }
     UiThreadUtil.runOnUiThread {
-      activity.requestPermissions(
-        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-        PERMISSION_REQUEST,
-        listener,
-      )
+      activity.requestPermissions(LOCATION_PERMISSIONS, PERMISSION_REQUEST, listener)
     }
   }
 
@@ -359,6 +414,10 @@ class HeracrossExampleDemoModule(reactContext: ReactApplicationContext) :
     const val NAME = NativeHeracrossExampleDemoSpec.NAME
     private const val DATABASE = "demo.db"
     private const val PERMISSION_REQUEST = 4201
+    private const val STATE_PREFERENCES = "heracross_example_demo"
+    private const val KEY_LOCATION_REFUSED = "location_permission_refused"
+    private val LOCATION_PERMISSIONS =
+      arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
     private const val FIX_TIMEOUT_MS = 30_000L
     private val SAMPLE_KEYS = listOf(
       "example_username",

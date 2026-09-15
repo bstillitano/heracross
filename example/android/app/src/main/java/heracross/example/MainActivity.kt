@@ -1,11 +1,21 @@
 package heracross.example
 
+import android.content.Context
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.scizor.Scizor
 
 class MainActivity : ReactActivity() {
+
+  /**
+   * Applies the font scale set on Scizor's Appearance screen to this activity, as Scizor's
+   * sample app does. Returns [newBase] unchanged while no override is set.
+   */
+  override fun attachBaseContext(newBase: Context) {
+    super.attachBaseContext(Scizor.wrapAppearance(newBase))
+  }
 
   /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule

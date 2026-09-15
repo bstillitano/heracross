@@ -1,6 +1,39 @@
 import { Platform } from 'react-native';
-import Heracross from 'heracross';
+import Heracross, {
+  type DeepLinkPreset,
+  type DeveloperOption,
+  type InvocationGesture,
+} from 'heracross';
 import ExampleDemo from './native/NativeHeracrossExampleDemo';
+
+/**
+ * The invocation gesture after launch: shake, Heracross's default, on iOS, and
+ * the floating button Scizor's sample uses on Android. Heracross has no getter
+ * for the gesture, so the Heracross tab starts from this.
+ */
+export const initialInvocationGesture: InvocationGesture =
+  Platform.OS === 'android' ? 'floatingButton' : 'shake';
+
+/** The FCM token Scizor's sample sets in `SampleApp.kt`. */
+export const sampleFcmToken = 'demo-fcm-token-a1b2c3d4e5f6g7h8i9j0';
+
+/** The deep link presets Scizor's sample sets in `SampleApp.kt`. */
+export const sampleDeepLinkPresets: DeepLinkPreset[] = [
+  { name: 'Home', url: 'scizorsample://home' },
+  { name: 'Profile', url: 'scizorsample://user/42' },
+  { name: 'Settings', url: 'scizorsample://settings' },
+  { name: 'Example.com', url: 'https://example.com' },
+];
+
+/**
+ * Scizor's sample sets five developer options in `SampleApp.kt`: three
+ * actions, a toggle and a value. Heracross's developer options are read-only
+ * name/value rows, which can't carry the callbacks the actions and the toggle
+ * run, so only the value row is ported.
+ */
+export const sampleDeveloperOptions: DeveloperOption[] = [
+  { name: 'Sample build', value: 'demo' },
+];
 
 /** `new_checkout_flow` → `New checkout flow`, the label Scizor's sample uses. Scyther shows the key. */
 function flagTitle(key: string) {
@@ -25,7 +58,7 @@ export function setUpExample() {
   // Shaking an emulator is awkward, so Scizor's sample opens the menu from a
   // floating button instead.
   if (Platform.OS === 'android') {
-    Heracross.setInvocationGesture('floatingButton');
+    Heracross.setInvocationGesture(initialInvocationGesture);
   }
 
   ExampleDemo.seedDemoData();
@@ -40,6 +73,14 @@ export function setUpExample() {
       { name: '_ga', value: 'GA1.2.1234567890.1234567890', domain: 'analytics.example.com', path: '/', expires: '1 year' },
       { name: 'auth_token', value: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9', domain: 'api.example.com', path: '/api', secure: true, expires: '1 day' },
     ].forEach((cookie) => Heracross.cookies.log(cookie));
+  }
+
+  // ScytherExample sets no FCM token, deep link presets or developer options.
+  // Scizor's sample sets all three.
+  if (Platform.OS === 'android') {
+    Heracross.setFcmToken(sampleFcmToken);
+    Heracross.deepLinks.setPresets(sampleDeepLinkPresets);
+    Heracross.setDeveloperOptions(sampleDeveloperOptions);
   }
 
   Heracross.setEnvironmentVariables({
@@ -83,7 +124,10 @@ export function setUpExample() {
   Heracross.servers.configure(
     servers.map((server) => ({
       ...server,
-      // Scizor lists a base URL for each environment; Scyther has no such field.
+      // Scizor lists a base URL for each environment, as Scizor's sample sets
+      // one. On iOS Heracross would store it as a `baseUrl` variable, so the
+      // example leaves it out there to keep each environment's variables
+      // exactly as ScytherExample registers them.
       baseUrl: Platform.OS === 'android' ? server.variables.API_URL : undefined,
     }))
   );

@@ -16,9 +16,9 @@ body:
       label: Before submitting a new issue
       description: Please perform simple checks first.
       options:
-        - label: I tested using the latest version of the library, as the bug might be already fixed.
+        - label: I tested using the latest release of the library, or `main`, as the bug might be already fixed.
           required: true
-        - label: I tested using a [supported version](https://github.com/reactwg/react-native-releases/blob/main/docs/support.md) of react native.
+        - label: I use React Native 0.87.x, the version this library supports, with the React Native patch from the installation guide applied.
           required: true
         - label: I checked for possible duplicate issues, with possible answers.
           required: true
@@ -35,8 +35,18 @@ body:
     id: library-version
     attributes:
       label: Library version
-      description: What version of the library are you using?
-      placeholder: "x.x.x"
+      description: The release tag or commit you installed, from the `github:bstillitano/heracross#...` entry in your package.json.
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Affected platforms
+      multiple: true
+      options:
+        - iOS
+        - Android
     validations:
       required: true
   - type: textarea

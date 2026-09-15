@@ -39,6 +39,21 @@ class ChangeTrackingTest {
   }
 
   @Test
+  fun `a change right after registering is reported`() {
+    val tracker = FlagChangeTracker()
+    tracker.recordIfUnseen("a", false)
+    assertEquals(listOf(FlagChange("a", true)), tracker.update(mapOf("a" to true)))
+  }
+
+  @Test
+  fun `recording does not overwrite a seen flag`() {
+    val tracker = FlagChangeTracker()
+    tracker.update(mapOf("a" to true))
+    tracker.recordIfUnseen("a", false)
+    assertEquals(emptyList<FlagChange>(), tracker.update(mapOf("a" to true)))
+  }
+
+  @Test
   fun `the first selection is not a change`() {
     val tracker = SelectionTracker()
     assertNull(tracker.update(null))
@@ -61,5 +76,20 @@ class ChangeTrackingTest {
     assertNull(tracker.update(null))
     assertNull(tracker.update("Development"))
     assertEquals("Production", tracker.update("Production"))
+  }
+
+  @Test
+  fun `a select right after the first read is reported`() {
+    val tracker = SelectionTracker()
+    tracker.recordIfUnseen("Development")
+    assertEquals("Staging", tracker.update("Staging"))
+  }
+
+  @Test
+  fun `recording does not overwrite a seen selection`() {
+    val tracker = SelectionTracker()
+    tracker.update("Development")
+    tracker.recordIfUnseen("Staging")
+    assertNull(tracker.update("Development"))
   }
 }

@@ -25,12 +25,18 @@ export interface Spec extends TurboModule {
   isStarted(): Promise<boolean>;
   showMenu(): void;
   hideMenu(): void;
+  isMenuOpen(): Promise<boolean>;
   setInvocationGesture(gesture: string): void;
   /** Scizor feature ids to hide. Android only; iOS ignores it. */
   setDisabledFeatures(features: ReadonlyArray<string>): void;
 
   registerFeatureFlag(key: string, title: string, defaultValue: boolean): void;
   isFeatureFlagEnabled(key: string): Promise<boolean>;
+  /** Each element: `{ key, title, defaultValue, enabled, override: boolean | null }`. */
+  getFeatureFlags(): Promise<ReadonlyArray<CodegenTypes.UnsafeObject>>;
+  /** The stored override, whether or not overrides are enabled; `null` when none. */
+  getFeatureFlagOverride(key: string): Promise<boolean | null>;
+  getFeatureFlagOverridesEnabled(): Promise<boolean>;
   setFeatureFlagOverridesEnabled(enabled: boolean): void;
   setFeatureFlagOverride(key: string, value: boolean): void;
   clearFeatureFlagOverride(key: string): void;
@@ -41,9 +47,13 @@ export interface Spec extends TurboModule {
   selectServer(id: string): void;
   /** Resolves `{ id, baseUrl, variables }`, or `null` when nothing is configured. */
   getSelectedServer(): Promise<CodegenTypes.UnsafeObject | null>;
+  /** Each element: `{ id, baseUrl, variables }`. */
+  getServers(): Promise<ReadonlyArray<CodegenTypes.UnsafeObject>>;
 
   /** A `{[key]: string}` map. */
   setEnvironmentVariables(variables: CodegenTypes.UnsafeObject): void;
+  /** Resolves a `{[key]: string}` map. */
+  getEnvironmentVariables(): Promise<CodegenTypes.UnsafeObject>;
   /** Each element: `{ name: string, value: string }`. */
   setDeveloperOptions(options: ReadonlyArray<CodegenTypes.UnsafeObject>): void;
   /** Each element: `{ name: string, url: string }`. */
@@ -76,4 +86,9 @@ export interface Spec extends TurboModule {
   readonly onServerChange: CodegenTypes.EventEmitter<ServerChangeEvent>;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('Heracross');
+/**
+ * `null` when the native module isn't in the app binary, for example before
+ * the app has been rebuilt after installing Heracross. `src/index.tsx` then
+ * makes every call a no-op instead of throwing when the package is imported.
+ */
+export default TurboModuleRegistry.get<Spec>('Heracross');

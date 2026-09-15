@@ -121,7 +121,10 @@ export function LocationScreen({ active }: { active: boolean }) {
   const [location, setLocation] = useState<LocationFix | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Native events for the life of the screen. Leaving it stops continuous updates.
+  // Native events for as long as the screen is mounted. Root keeps every tab
+  // mounted, so switching tabs doesn't stop continuous updates, just as leaving
+  // LocationTestView doesn't; Stop Continuous Updates does, and so does
+  // unmounting, such as on a reload.
   useEffect(() => {
     const subscriptions = [
       ExampleDemo.onLocationAuthorizationChange(setAuthorization),
@@ -236,6 +239,12 @@ export function LocationScreen({ active }: { active: boolean }) {
       )}
 
       <Section header={toolkit.locationReportsSection}>
+        {/* LocationTestView's `@unknown default`, which also covers the moment before the status arrives. */}
+        {authorization !== 'notDetermined' &&
+          authorization !== 'denied' &&
+          authorization !== 'authorized' && (
+            <TextRow>Unknown authorization status</TextRow>
+          )}
         {authorization === 'notDetermined' && (
           <ButtonRow
             title="Request Location Permission"

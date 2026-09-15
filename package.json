@@ -1,6 +1,7 @@
 {
   "name": "heracross",
   "version": "0.1.0",
+  "private": true,
   "description": "React Native bridge for the Scyther (iOS) and Scizor (Android) debugging toolkits",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -10,11 +11,13 @@
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },
+    "./jest": "./jest/index.js",
     "./package.json": "./package.json"
   },
   "files": [
     "src",
     "lib",
+    "jest",
     "android",
     "ios",
     "patches",
@@ -36,8 +39,9 @@
   ],
   "scripts": {
     "example": "yarn workspace heracross-example",
-    "clean": "del-cli android/build ios/.build example/android/build example/android/app/build example/android/app/.cxx example/ios/build lib coverage .turbo",
+    "clean": "del-cli android/build ios/.build ios/.swiftpm example/android/build example/android/app/build example/android/app/.cxx example/ios/build example/ios/HeracrossExample.xcodeproj/project.xcworkspace/xcshareddata/swiftpm lib coverage .turbo",
     "prepare": "bob build",
+    "prepack": "bob build",
     "typecheck": "tsc",
     "test": "jest",
     "test:ios": "node scripts/test-ios.js",

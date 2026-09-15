@@ -2,11 +2,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from './SafeArea';
 import { useTheme } from './theme';
 
-export type TabKey = 'home' | 'location';
+export type TabKey = 'home' | 'location' | 'heracross';
 
 const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: 'home', label: 'Home', icon: '⌂' },
   { key: 'location', label: 'Location', icon: '➤' },
+  { key: 'heracross', label: 'Heracross', icon: '☰' },
 ];
 
 /** The bottom tab bar SwiftUI's `TabView` draws. */
@@ -28,6 +29,9 @@ export function TabBar({
           backgroundColor: theme.bar,
           borderTopColor: theme.separator,
           paddingBottom: insets.bottom,
+          // Keeps the tabs clear of the notch and rounded corners in landscape.
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
         },
       ]}
     >

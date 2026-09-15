@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
   type StyleProp,
@@ -182,6 +183,82 @@ export function TextRow({
       >
         {children}
       </Text>
+    </View>
+  );
+}
+
+/** One option of SwiftUI's inline `Picker`: a title, an optional subtitle, and a checkmark when chosen. */
+export function CheckRow({
+  title,
+  subtitle,
+  checked,
+  onPress,
+  disabled = false,
+}: {
+  title: string;
+  subtitle?: string;
+  checked: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        pressed && { backgroundColor: theme.separator },
+      ]}
+    >
+      <View style={styles.fill}>
+        <Text
+          style={[
+            styles.text,
+            { color: disabled ? theme.secondaryLabel : theme.label },
+          ]}
+        >
+          {title}
+        </Text>
+        {subtitle != null && (
+          <Text style={[styles.caption, { color: theme.secondaryLabel }]}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
+      {checked && (
+        <Text style={[styles.text, styles.value, { color: theme.tint }]}>✓</Text>
+      )}
+    </Pressable>
+  );
+}
+
+/** SwiftUI's `Toggle`: a label with a switch beside it. */
+export function SwitchRow({
+  label,
+  value,
+  onValueChange,
+  disabled = false,
+}: {
+  label: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.text, styles.fill, { color: theme.label }]}>
+        {label}
+      </Text>
+      <Switch
+        accessibilityLabel={label}
+        value={value}
+        onValueChange={onValueChange}
+        disabled={disabled}
+      />
     </View>
   );
 }

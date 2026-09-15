@@ -31,7 +31,11 @@ export type SafeAreaInsets = {
  * Authorization values are `'notDetermined'`, `'denied'` or `'authorized'`.
  */
 export interface Spec extends TurboModule {
-  /** Cookies, keychain items (iOS) or preferences (Android), and the demo database. */
+  /**
+   * iOS: cookies, keychain items and the demo database. Android: the
+   * `user_prefs` and `app_settings` SharedPreferences Scizor's sample seeds,
+   * and the demo database; Android's cookies are logged from `src/setup.ts`.
+   */
   seedDemoData(): void;
 
   writeSampleDefaults(): void;

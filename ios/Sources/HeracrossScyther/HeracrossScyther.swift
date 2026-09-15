@@ -7,6 +7,7 @@ import Scyther
 /// `Heracross.mm` declares a matching `@interface` by hand rather than importing
 /// this target's generated `-Swift.h` header, so every selector here is spelled
 /// out explicitly and must stay in sync with that declaration.
+/// `SelectorContractTests` checks that it does.
 ///
 /// Turbo Module methods arrive on the module's own serial queue. Scyther's
 /// facade is `@MainActor`, so every call is forwarded to the main queue, which
@@ -42,11 +43,18 @@ public final class HeracrossScyther: NSObject {
         onMain { Scyther.hideMenu() }
     }
 
+    /// Calls back with whether the menu is presented.
+    @objc(isMenuOpen:)
+    public static func isMenuOpen(_ completion: @escaping @Sendable (Bool) -> Void) {
+        onMain { completion(Scyther.isPresented) }
+    }
+
     /// `"shake"` maps to ``ScytherGesture/shake``; anything else to
     /// ``ScytherGesture/custom``, which leaves opening the menu to the host.
     @objc(setInvocationGesture:)
     public static func setInvocationGesture(_ gesture: String) {
-        onMain { Scyther.invocationGesture = gesture == "shake" ? .shake : .custom }
+        let shake = MenuContent.isShakeGesture(gesture)
+        onMain { Scyther.invocationGesture = shake ? .shake : .custom }
     }
 
     // MARK: - Feature flags
@@ -56,6 +64,7 @@ public final class HeracrossScyther: NSObject {
     public static func registerFeatureFlag(_ key: String, defaultValue: Bool) {
         onMain {
             Scyther.featureFlags.register(key, remoteValue: defaultValue)
+            flagTracker.recordIfUnseen(key, enabled: Scyther.featureFlags.isEnabled(key))
             scheduleChangeCheck()
         }
     }
@@ -64,6 +73,46 @@ public final class HeracrossScyther: NSObject {
     @objc(isFeatureFlagEnabled:completion:)
     public static func isFeatureFlagEnabled(_ key: String, completion: @escaping @Sendable (Bool) -> Void) {
         onMain { completion(Scyther.featureFlags.isEnabled(key)) }
+    }
+
+    /// Calls back with every registered flag, as parallel arrays: keys, remote
+    /// values, effective values, and stored overrides encoded by
+    /// ``OverrideState``.
+    @objc(getFeatureFlags:)
+    public static func getFeatureFlags(
+        _ completion: @escaping @Sendable ([String], [Bool], [Bool], [Int]) -> Void
+    ) {
+        onMain {
+            let flags = Scyther.featureFlags.all
+            completion(
+                flags.map(\.name),
+                flags.map(\.remoteValue),
+                flags.map { Scyther.featureFlags.isEnabled($0.name) },
+                flags.map { OverrideState.encode($0.hasLocalOverride ? $0.localValue : nil) }
+            )
+        }
+    }
+
+    /// Calls back with whether the flag has a stored override, and its value,
+    /// regardless of the overrides switch.
+    @objc(getFeatureFlagOverride:completion:)
+    public static func getFeatureFlagOverride(
+        _ key: String,
+        completion: @escaping @Sendable (Bool, Bool) -> Void
+    ) {
+        onMain {
+            guard let flag = Scyther.featureFlags.all.first(where: { $0.name == key }), flag.hasLocalOverride else {
+                completion(false, false)
+                return
+            }
+            completion(true, flag.localValue)
+        }
+    }
+
+    /// Calls back with the menu's "Enable overrides" switch.
+    @objc(getFeatureFlagOverridesEnabled:)
+    public static func getFeatureFlagOverridesEnabled(_ completion: @escaping @Sendable (Bool) -> Void) {
+        onMain { completion(Scyther.featureFlags.localOverridesEnabled) }
     }
 
     /// The menu's "Enable overrides" switch.
@@ -105,8 +154,9 @@ public final class HeracrossScyther: NSObject {
     // MARK: - Servers
 
     /// Each element is `{ id, baseUrl, variables }`. Afterwards, if Scyther's
-    /// saved selection isn't a configured server, the first one is selected, so
-    /// iOS falls back the way Android does.
+    /// saved selection isn't one of these servers, the first one is selected,
+    /// as on Android. Scyther can't unregister a server, so servers left out
+    /// stay registered.
     @objc(configureServers:)
     public static func configureServers(_ servers: [[String: Any]]) {
         let entries = servers.compactMap(ServerEntry.init)
@@ -114,37 +164,63 @@ public final class HeracrossScyther: NSObject {
             for entry in entries {
                 await Scyther.servers.register(id: entry.id, variables: entry.variables)
             }
-            if await Scyther.servers.current == nil, let first = entries.first {
-                await Scyther.servers.select(first.id)
+            let currentId = await Scyther.servers.currentId
+            let registeredIds = await Scyther.servers.all.map(\.id)
+            let selected = ServerSelection.resolvedId(currentId: currentId, registeredIds: registeredIds)
+            await MainActor.run { selectionTracker.recordIfUnseen(selected) }
+            if let fallback = ServerSelection.fallbackId(currentId: currentId, configuredIds: entries.map(\.id)) {
+                await Scyther.servers.select(fallback)
             }
             scheduleChangeCheck()
         }
     }
 
-    /// Selects a configured server. Unknown ids are ignored, as on Android;
+    /// Selects a registered server. Unknown ids are ignored, as on Android;
     /// Scyther itself would store them and leave no server selected.
     @objc(selectServer:)
     public static func selectServer(_ id: String) {
         enqueueServerWork {
-            guard await Scyther.servers.all.contains(where: { $0.id == id }) else { return }
+            let registeredIds = await Scyther.servers.all.map(\.id)
+            guard registeredIds.contains(id) else { return }
+            let currentId = await Scyther.servers.currentId
+            let selected = ServerSelection.resolvedId(currentId: currentId, registeredIds: registeredIds)
+            await MainActor.run { selectionTracker.recordIfUnseen(selected) }
             await Scyther.servers.select(id)
             scheduleChangeCheck()
         }
     }
 
     /// Calls back with the selected server's id, base URL and variables (without
-    /// the stored `baseUrl` entry), or a `nil` id when none is configured.
+    /// the stored `baseUrl` entry), or a `nil` id when no server is registered.
+    /// When Scyther's saved id isn't registered, the first server is reported.
     @objc(getSelectedServer:)
     public static func getSelectedServer(
         _ completion: @escaping @Sendable (String?, String, [String: String]) -> Void
     ) {
         enqueueServerWork {
-            guard let current = await Scyther.servers.current else {
+            let all = await Scyther.servers.all
+            let currentId = await Scyther.servers.currentId
+            guard let id = ServerSelection.resolvedId(currentId: currentId, registeredIds: all.map(\.id)),
+                  let server = all.first(where: { $0.id == id })
+            else {
                 completion(nil, "", [:])
                 return
             }
-            let split = ServerEntry.split(current.variables)
-            completion(current.id, split.baseUrl, split.variables)
+            let split = ServerEntry.split(server.variables)
+            completion(server.id, split.baseUrl, split.variables)
+        }
+    }
+
+    /// Calls back with every registered server, as parallel arrays of ids, base
+    /// URLs and variables.
+    @objc(getServers:)
+    public static func getServers(
+        _ completion: @escaping @Sendable ([String], [String], [[String: String]]) -> Void
+    ) {
+        enqueueServerWork {
+            let all = await Scyther.servers.all
+            let splits = all.map { ServerEntry.split($0.variables) }
+            completion(all.map(\.id), splits.map(\.baseUrl), splits.map(\.variables))
         }
     }
 
@@ -165,8 +241,8 @@ public final class HeracrossScyther: NSObject {
     /// ones, and starts watching for changes.
     ///
     /// Scyther posts no change notifications, but it saves flag overrides, the
-    /// overrides switch and the selected server in `UserDefaults`. So Heracross
-    /// re-reads them whenever defaults change anywhere in the process, and after
+    /// overrides switch and the selected server in its own `UserDefaults`
+    /// suite. So Heracross re-reads them whenever that suite changes, and after
     /// each call here that could change them, and reports what differs from the
     /// last read.
     @objc(setFeatureFlagChangeHandler:serverChangeHandler:)
@@ -180,7 +256,7 @@ public final class HeracrossScyther: NSObject {
             if defaultsObserver == nil {
                 defaultsObserver = NotificationCenter.default.addObserver(
                     forName: UserDefaults.didChangeNotification,
-                    object: nil,
+                    object: UserDefaults.scyther,
                     queue: nil
                 ) { _ in
                     scheduleChangeCheck()
@@ -215,9 +291,10 @@ public final class HeracrossScyther: NSObject {
         // Read the selection behind any queued server work, so a `select` made
         // before this check is already visible to it.
         enqueueServerWork {
-            let current = await Scyther.servers.current
-            let id = current?.id
-            let variables = current?.variables ?? [:]
+            let all = await Scyther.servers.all
+            let currentId = await Scyther.servers.currentId
+            let id = ServerSelection.resolvedId(currentId: currentId, registeredIds: all.map(\.id))
+            let variables = all.first(where: { $0.id == id })?.variables ?? [:]
             await MainActor.run {
                 guard let changed = selectionTracker.update(id) else { return }
                 let split = ServerEntry.split(variables)
@@ -232,17 +309,20 @@ public final class HeracrossScyther: NSObject {
     /// strings are skipped.
     @objc(setEnvironmentVariables:)
     public static func setEnvironmentVariables(_ variables: [String: Any]) {
-        let values = variables.compactMapValues { $0 as? String }
+        let values = MenuContent.environmentVariables(variables)
         onMain { Scyther.environmentVariables = values }
+    }
+
+    /// Calls back with the Environment Variables screen's rows.
+    @objc(getEnvironmentVariables:)
+    public static func getEnvironmentVariables(_ completion: @escaping @Sendable ([String: String]) -> Void) {
+        onMain { completion(Scyther.environmentVariables) }
     }
 
     /// Each element is `{ name, value }`, shown as a read-only value row.
     @objc(setDeveloperOptions:)
     public static func setDeveloperOptions(_ options: [[String: Any]]) {
-        let rows: [NameValue] = options.compactMap { option in
-            guard let name = option["name"] as? String else { return nil }
-            return NameValue(name: name, value: option["value"] as? String ?? "")
-        }
+        let rows = MenuContent.developerOptions(options)
         onMain {
             Scyther.developerOptions = rows.map { DeveloperOption(name: $0.name, value: $0.value) }
         }
@@ -251,12 +331,7 @@ public final class HeracrossScyther: NSObject {
     /// Each element is `{ name, url }`, shown in the Deep Link Tester.
     @objc(setDeepLinkPresets:)
     public static func setDeepLinkPresets(_ presets: [[String: Any]]) {
-        let links: [NameValue] = presets.compactMap { preset in
-            guard let name = preset["name"] as? String, let url = preset["url"] as? String else {
-                return nil
-            }
-            return NameValue(name: name, value: url)
-        }
+        let links = MenuContent.deepLinkPresets(presets)
         onMain {
             Scyther.deepLinks.presets = links.map { DeepLinkPreset(name: $0.name, url: $0.value) }
         }
@@ -339,9 +414,4 @@ public final class HeracrossScyther: NSObject {
             }
         }
     }
-}
-
-private struct NameValue: Sendable {
-    let name: String
-    let value: String
 }

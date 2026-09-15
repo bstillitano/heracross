@@ -8,55 +8,119 @@ import {
 } from '@jest/globals';
 import { Platform } from 'react-native';
 
-jest.mock('../NativeHeracross', () => {
-  const mock: import('../NativeHeracross').Spec = {
-    getConstants: jest.fn(() => ({})),
-    start: jest.fn(),
-    isStarted: jest.fn(() => Promise.resolve(true)),
-    showMenu: jest.fn(),
-    hideMenu: jest.fn(),
-    setInvocationGesture: jest.fn(),
-    setDisabledFeatures: jest.fn(),
-    registerFeatureFlag: jest.fn(),
-    isFeatureFlagEnabled: jest.fn(() => Promise.resolve(true)),
-    setFeatureFlagOverridesEnabled: jest.fn(),
-    setFeatureFlagOverride: jest.fn(),
-    clearFeatureFlagOverride: jest.fn(),
-    resetFeatureFlagOverrides: jest.fn(),
-    configureServers: jest.fn(),
-    selectServer: jest.fn(),
-    getSelectedServer: jest.fn(() => Promise.resolve(null)),
-    setEnvironmentVariables: jest.fn(),
-    setDeveloperOptions: jest.fn(),
-    setDeepLinkPresets: jest.fn(),
-    setApnsToken: jest.fn(),
-    setFcmToken: jest.fn(),
-    logNotification: jest.fn(),
-    logCookie: jest.fn(),
-    captureWebViewCookies: jest.fn(),
-    clearLoggedCookies: jest.fn(),
-    triggerTestCrash: jest.fn(),
-    getLocationSpoofingState: jest.fn(() => Promise.resolve(null)),
-    onFeatureFlagChange: jest.fn(() => ({ remove: jest.fn() })),
-    onServerChange: jest.fn(() => ({ remove: jest.fn() })),
-  };
-  return { __esModule: true, default: mock };
-});
+type Spec = import('../NativeHeracross').Spec;
 
-// eslint-disable-next-line import/first
-import Heracross from '../index';
-// eslint-disable-next-line import/first
+function mockCreateNative() {
+  return {
+    getConstants: jest.fn(() => ({})),
+    start: jest.fn<Spec['start']>(),
+    isStarted: jest.fn<Spec['isStarted']>(() => Promise.resolve(true)),
+    showMenu: jest.fn<Spec['showMenu']>(),
+    hideMenu: jest.fn<Spec['hideMenu']>(),
+    isMenuOpen: jest.fn<Spec['isMenuOpen']>(() => Promise.resolve(false)),
+    setInvocationGesture: jest.fn<Spec['setInvocationGesture']>(),
+    setDisabledFeatures: jest.fn<Spec['setDisabledFeatures']>(),
+    registerFeatureFlag: jest.fn<Spec['registerFeatureFlag']>(),
+    isFeatureFlagEnabled: jest.fn<Spec['isFeatureFlagEnabled']>(() =>
+      Promise.resolve(true)
+    ),
+    getFeatureFlags: jest.fn<Spec['getFeatureFlags']>(() => Promise.resolve([])),
+    getFeatureFlagOverride: jest.fn<Spec['getFeatureFlagOverride']>(() =>
+      Promise.resolve(null)
+    ),
+    getFeatureFlagOverridesEnabled: jest.fn<
+      Spec['getFeatureFlagOverridesEnabled']
+    >(() => Promise.resolve(false)),
+    setFeatureFlagOverridesEnabled:
+      jest.fn<Spec['setFeatureFlagOverridesEnabled']>(),
+    setFeatureFlagOverride: jest.fn<Spec['setFeatureFlagOverride']>(),
+    clearFeatureFlagOverride: jest.fn<Spec['clearFeatureFlagOverride']>(),
+    resetFeatureFlagOverrides: jest.fn<Spec['resetFeatureFlagOverrides']>(),
+    configureServers: jest.fn<Spec['configureServers']>(),
+    selectServer: jest.fn<Spec['selectServer']>(),
+    getSelectedServer: jest.fn<Spec['getSelectedServer']>(() =>
+      Promise.resolve(null)
+    ),
+    getServers: jest.fn<Spec['getServers']>(() => Promise.resolve([])),
+    setEnvironmentVariables: jest.fn<Spec['setEnvironmentVariables']>(),
+    getEnvironmentVariables: jest.fn<Spec['getEnvironmentVariables']>(() =>
+      Promise.resolve({})
+    ),
+    setDeveloperOptions: jest.fn<Spec['setDeveloperOptions']>(),
+    setDeepLinkPresets: jest.fn<Spec['setDeepLinkPresets']>(),
+    setApnsToken: jest.fn<Spec['setApnsToken']>(),
+    setFcmToken: jest.fn<Spec['setFcmToken']>(),
+    logNotification: jest.fn<Spec['logNotification']>(),
+    logCookie: jest.fn<Spec['logCookie']>(),
+    captureWebViewCookies: jest.fn<Spec['captureWebViewCookies']>(),
+    clearLoggedCookies: jest.fn<Spec['clearLoggedCookies']>(),
+    triggerTestCrash: jest.fn<Spec['triggerTestCrash']>(),
+    getLocationSpoofingState: jest.fn<Spec['getLocationSpoofingState']>(() =>
+      Promise.resolve(null)
+    ),
+    onFeatureFlagChange: jest.fn<Spec['onFeatureFlagChange']>(() => ({
+      remove: jest.fn(),
+    })),
+    onServerChange: jest.fn<Spec['onServerChange']>(() => ({
+      remove: jest.fn(),
+    })),
+  } satisfies Spec;
+}
+
+jest.mock('../NativeHeracross', () => ({
+  __esModule: true,
+  default: mockCreateNative(),
+}));
+
+import HeracrossDefault, { Heracross } from '../index';
 import NativeHeracross from '../NativeHeracross';
 
-const native = jest.mocked(NativeHeracross);
+const native = NativeHeracross as unknown as ReturnType<typeof mockCreateNative>;
 
 describe('Heracross', () => {
+  let warn: ReturnType<typeof jest.spyOn>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('exports the same object as default and named export', () => {
+    expect(HeracrossDefault).toBe(Heracross);
+  });
+
+  it('is available when the native module is linked', () => {
+    expect(Heracross.isAvailable).toBe(true);
+  });
+
+  describe('supports', () => {
+    it('reports the Android-only features on Android', () => {
+      jest.replaceProperty(Platform, 'OS', 'android');
+      expect(Heracross.supports).toEqual({
+        floatingButton: true,
+        disabledFeatures: true,
+        cookies: true,
+        apnsToken: false,
+        notificationLog: false,
+        locationSpoofingState: false,
+      });
+    });
+
+    it('reports the iOS-only features on iOS', () => {
+      jest.replaceProperty(Platform, 'OS', 'ios');
+      expect(Heracross.supports).toEqual({
+        floatingButton: false,
+        disabledFeatures: false,
+        cookies: false,
+        apnsToken: true,
+        notificationLog: true,
+        locationSpoofingState: true,
+      });
+    });
   });
 
   describe('start', () => {
@@ -77,48 +141,36 @@ describe('Heracross', () => {
 
     it('resolves whether the toolkit started', async () => {
       await expect(Heracross.isStarted()).resolves.toBe(true);
-      expect(native.isStarted).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('setDisabledFeatures', () => {
-    it('passes feature ids as strings', () => {
-      Heracross.setDisabledFeatures(['keystore', 'console', 5 as never]);
-      expect(native.setDisabledFeatures).toHaveBeenCalledWith([
-        'keystore',
-        'console',
-        '5',
-      ]);
     });
   });
 
   describe('menu', () => {
-    it('forwards showMenu and hideMenu', () => {
+    it('forwards showMenu, hideMenu and isMenuOpen', async () => {
       Heracross.showMenu();
       Heracross.hideMenu();
+      native.isMenuOpen.mockResolvedValueOnce(true);
+      await expect(Heracross.isMenuOpen()).resolves.toBe(true);
       expect(native.showMenu).toHaveBeenCalledTimes(1);
       expect(native.hideMenu).toHaveBeenCalledTimes(1);
     });
 
     it('warns that floatingButton is Android only on iOS', () => {
       jest.replaceProperty(Platform, 'OS', 'ios');
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
       Heracross.setInvocationGesture('floatingButton');
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('Android only')
-      );
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Android only'));
       expect(native.setInvocationGesture).toHaveBeenCalledWith('floatingButton');
     });
 
-    it('does not warn for floatingButton on Android', () => {
+    it('does not warn for supported gestures', () => {
+      jest.replaceProperty(Platform, 'OS', 'ios');
+      Heracross.setInvocationGesture('shake');
+      Heracross.setInvocationGesture('none');
       jest.replaceProperty(Platform, 'OS', 'android');
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
       Heracross.setInvocationGesture('floatingButton');
       expect(warn).not.toHaveBeenCalled();
     });
 
     it('warns about an unknown gesture', () => {
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
       Heracross.setInvocationGesture('wave' as never);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('unknown invocation gesture')
@@ -127,24 +179,25 @@ describe('Heracross', () => {
     });
   });
 
-  describe('featureFlags', () => {
-    it('registers a single flag or a list, titling by key when untitled', () => {
-      Heracross.featureFlags.register({ key: 'a', defaultValue: true });
-      Heracross.featureFlags.register([
-        { key: 'b', title: 'Bee', defaultValue: false },
+  describe('setDisabledFeatures', () => {
+    it('passes primitive ids as strings and skips the rest', () => {
+      Heracross.setDisabledFeatures([
+        'keystore',
+        5 as never,
+        null as never,
+        {} as never,
       ]);
-      expect(native.registerFeatureFlag).toHaveBeenNthCalledWith(
-        1,
-        'a',
-        'a',
-        true
-      );
-      expect(native.registerFeatureFlag).toHaveBeenNthCalledWith(
-        2,
-        'b',
-        'Bee',
-        false
-      );
+      expect(native.setDisabledFeatures).toHaveBeenCalledWith(['keystore', '5']);
+    });
+  });
+
+  describe('featureFlags', () => {
+    it('registers a single flag or a readonly list, titling by key when untitled', () => {
+      Heracross.featureFlags.register({ key: 'a', defaultValue: true });
+      const flags = [{ key: 'b', title: 'Bee', defaultValue: false }] as const;
+      Heracross.featureFlags.register(flags);
+      expect(native.registerFeatureFlag).toHaveBeenNthCalledWith(1, 'a', 'a', true);
+      expect(native.registerFeatureFlag).toHaveBeenNthCalledWith(2, 'b', 'Bee', false);
     });
 
     it('coerces keys, titles and default values', () => {
@@ -156,9 +209,41 @@ describe('Heracross', () => {
       expect(native.registerFeatureFlag).toHaveBeenCalledWith('7', '8', true);
     });
 
+    it('skips flags without a key, and a missing list entry', () => {
+      Heracross.featureFlags.register([
+        { key: '', defaultValue: true },
+        { key: {} as unknown as string, defaultValue: true },
+        null as never,
+        { key: 'ok', defaultValue: false },
+      ]);
+      expect(native.registerFeatureFlag).toHaveBeenCalledTimes(1);
+      expect(native.registerFeatureFlag).toHaveBeenCalledWith('ok', 'ok', false);
+      expect(warn).toHaveBeenCalledTimes(3);
+    });
+
     it('resolves flag state from native', async () => {
       await expect(Heracross.featureFlags.isEnabled('a')).resolves.toBe(true);
       expect(native.isFeatureFlagEnabled).toHaveBeenCalledWith('a');
+    });
+
+    it('reads every flag, normalising what native resolves', async () => {
+      native.getFeatureFlags.mockResolvedValueOnce([
+        { key: 'a', title: 'Ay', defaultValue: true, enabled: false, override: false },
+        { key: 'b', defaultValue: false, enabled: true, override: null },
+      ]);
+      await expect(Heracross.featureFlags.getAll()).resolves.toEqual([
+        { key: 'a', title: 'Ay', defaultValue: true, enabled: false, override: false },
+        { key: 'b', title: 'b', defaultValue: false, enabled: true, override: null },
+      ]);
+    });
+
+    it('reads one override and the overrides switch', async () => {
+      native.getFeatureFlagOverride.mockResolvedValueOnce(true);
+      await expect(Heracross.featureFlags.getOverride('a')).resolves.toBe(true);
+      expect(native.getFeatureFlagOverride).toHaveBeenCalledWith('a');
+      await expect(Heracross.featureFlags.getOverride('b')).resolves.toBeNull();
+      native.getFeatureFlagOverridesEnabled.mockResolvedValueOnce(true);
+      await expect(Heracross.featureFlags.getOverridesEnabled()).resolves.toBe(true);
     });
 
     it('forwards override changes', () => {
@@ -184,7 +269,7 @@ describe('Heracross', () => {
   });
 
   describe('servers', () => {
-    it('normalises servers so native only sees strings', () => {
+    it('normalises servers so native only sees strings, skipping those without an id', () => {
       Heracross.servers.configure([
         { id: 'Dev' },
         {
@@ -193,19 +278,19 @@ describe('Heracross', () => {
           variables: {
             RETRIES: 3 as unknown as string,
             EMPTY: null as unknown as string,
+            NESTED: {} as unknown as string,
           },
         },
         { id: 9 as unknown as string, baseUrl: null as unknown as string },
+        { id: '' },
+        { baseUrl: 'https://orphan' } as never,
       ]);
       expect(native.configureServers).toHaveBeenCalledWith([
         { id: 'Dev', baseUrl: '', variables: {} },
-        {
-          id: 'Prod',
-          baseUrl: 'https://api',
-          variables: { RETRIES: '3', EMPTY: '' },
-        },
+        { id: 'Prod', baseUrl: 'https://api', variables: { RETRIES: '3' } },
         { id: '9', baseUrl: '', variables: {} },
       ]);
+      expect(warn).toHaveBeenCalledTimes(2);
     });
 
     it('selects a server by id', () => {
@@ -218,20 +303,31 @@ describe('Heracross', () => {
     });
 
     it('maps an undefined result to null', async () => {
-      native.getSelectedServer.mockResolvedValueOnce(
-        undefined as unknown as null
-      );
+      native.getSelectedServer.mockResolvedValueOnce(undefined as unknown as null);
       await expect(Heracross.servers.getSelected()).resolves.toBeNull();
     });
 
-    it('passes the selected server through', async () => {
-      const server = {
+    it('normalises the selected server', async () => {
+      native.getSelectedServer.mockResolvedValueOnce({
         id: 'Dev',
-        baseUrl: 'https://dev',
+        variables: { REGION: 'au', BAD: {} },
+      });
+      await expect(Heracross.servers.getSelected()).resolves.toEqual({
+        id: 'Dev',
+        baseUrl: '',
         variables: { REGION: 'au' },
-      };
-      native.getSelectedServer.mockResolvedValueOnce(server);
-      await expect(Heracross.servers.getSelected()).resolves.toEqual(server);
+      });
+    });
+
+    it('reads every server', async () => {
+      native.getServers.mockResolvedValueOnce([
+        { id: 'Dev', baseUrl: 'https://dev', variables: {} },
+        { id: 'Prod', baseUrl: '', variables: { REGION: 'au' } },
+      ]);
+      await expect(Heracross.servers.getAll()).resolves.toEqual([
+        { id: 'Dev', baseUrl: 'https://dev', variables: {} },
+        { id: 'Prod', baseUrl: '', variables: { REGION: 'au' } },
+      ]);
     });
 
     it('delivers server changes to a listener and returns the subscription', () => {
@@ -240,13 +336,79 @@ describe('Heracross', () => {
       const listener = jest.fn();
       expect(Heracross.servers.addListener(listener)).toBe(subscription);
       const handler = native.onServerChange.mock.calls[0]![0];
-      const server = {
+      handler({ id: 'Staging', baseUrl: 'https://staging', variables: { REGION: 'au' } });
+      expect(listener).toHaveBeenCalledWith({
         id: 'Staging',
         baseUrl: 'https://staging',
         variables: { REGION: 'au' },
-      };
-      handler(server);
-      expect(listener).toHaveBeenCalledWith(server);
+      });
+    });
+  });
+
+  describe('menu content', () => {
+    it('keeps primitive environment variable values and reads them back', async () => {
+      Heracross.setEnvironmentVariables({
+        FLAG: true as unknown as string,
+        COUNT: 2 as unknown as string,
+        NULL: null as unknown as string,
+        NESTED: { a: 1 } as unknown as string,
+      });
+      expect(native.setEnvironmentVariables).toHaveBeenCalledWith({
+        FLAG: 'true',
+        COUNT: '2',
+      });
+      native.getEnvironmentVariables.mockResolvedValueOnce({ API: 'https://api' });
+      await expect(Heracross.getEnvironmentVariables()).resolves.toEqual({
+        API: 'https://api',
+      });
+    });
+
+    it('skips developer options without a name and defaults the value', () => {
+      Heracross.setDeveloperOptions([
+        { name: 'Build', value: 42 as unknown as string },
+        { name: 'Empty', value: undefined as unknown as string },
+        { name: undefined as unknown as string, value: 'x' },
+      ]);
+      expect(native.setDeveloperOptions).toHaveBeenCalledWith([
+        { name: 'Build', value: '42' },
+        { name: 'Empty', value: '' },
+      ]);
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips deep link presets without a name or url', () => {
+      Heracross.deepLinks.setPresets([
+        { name: 'Home', url: 'myapp://home' },
+        { name: 'Profile', url: 42 as unknown as string },
+        { name: 'No URL' } as never,
+        { url: 'myapp://nameless' } as never,
+      ]);
+      expect(native.setDeepLinkPresets).toHaveBeenCalledWith([
+        { name: 'Home', url: 'myapp://home' },
+        { name: 'Profile', url: '42' },
+      ]);
+      expect(warn).toHaveBeenCalledTimes(2);
+    });
+
+    it('forwards push tokens as text or null', () => {
+      Heracross.setApnsToken('apns');
+      Heracross.setApnsToken(null);
+      Heracross.setFcmToken(123 as unknown as string);
+      Heracross.setFcmToken(undefined as unknown as null);
+      expect(native.setApnsToken).toHaveBeenNthCalledWith(1, 'apns');
+      expect(native.setApnsToken).toHaveBeenNthCalledWith(2, null);
+      expect(native.setFcmToken).toHaveBeenNthCalledWith(1, '123');
+      expect(native.setFcmToken).toHaveBeenNthCalledWith(2, null);
+    });
+
+    it('forwards notification payloads and skips anything else', () => {
+      const payload = { aps: { alert: 'Hello' } };
+      Heracross.notifications.log(payload);
+      Heracross.notifications.log(null as never);
+      Heracross.notifications.log(['a'] as never);
+      expect(native.logNotification).toHaveBeenCalledTimes(1);
+      expect(native.logNotification).toHaveBeenCalledWith(payload);
+      expect(warn).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -285,58 +447,19 @@ describe('Heracross', () => {
       });
     });
 
+    it('skips a cookie without a name, value or domain', () => {
+      Heracross.cookies.log({ name: 'a', value: 'b' } as never);
+      Heracross.cookies.log({ value: 'b', domain: 'c' } as never);
+      Heracross.cookies.log(null as never);
+      expect(native.logCookie).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(3);
+    });
+
     it('forwards WebView capture and clearing', () => {
       Heracross.cookies.captureWebView('https://example.com');
       Heracross.cookies.clear();
-      expect(native.captureWebViewCookies).toHaveBeenCalledWith(
-        'https://example.com'
-      );
+      expect(native.captureWebViewCookies).toHaveBeenCalledWith('https://example.com');
       expect(native.clearLoggedCookies).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('menu content', () => {
-    it('stringifies environment variables and developer options', () => {
-      Heracross.setEnvironmentVariables({ FLAG: true as unknown as string });
-      Heracross.setDeveloperOptions([
-        { name: 'Build', value: 42 as unknown as string },
-        { name: undefined as unknown as string, value: 'x' },
-      ]);
-      expect(native.setEnvironmentVariables).toHaveBeenCalledWith({
-        FLAG: 'true',
-      });
-      expect(native.setDeveloperOptions).toHaveBeenCalledWith([
-        { name: 'Build', value: '42' },
-        { name: '', value: 'x' },
-      ]);
-    });
-
-    it('forwards deep link presets as strings', () => {
-      Heracross.deepLinks.setPresets([
-        { name: 'Home', url: 'myapp://home' },
-        { name: 'Profile', url: 42 as unknown as string },
-      ]);
-      expect(native.setDeepLinkPresets).toHaveBeenCalledWith([
-        { name: 'Home', url: 'myapp://home' },
-        { name: 'Profile', url: '42' },
-      ]);
-    });
-
-    it('forwards push tokens, including null', () => {
-      Heracross.setApnsToken('apns');
-      Heracross.setApnsToken(null);
-      Heracross.setFcmToken('fcm');
-      Heracross.setFcmToken(undefined as unknown as null);
-      expect(native.setApnsToken).toHaveBeenNthCalledWith(1, 'apns');
-      expect(native.setApnsToken).toHaveBeenNthCalledWith(2, null);
-      expect(native.setFcmToken).toHaveBeenNthCalledWith(1, 'fcm');
-      expect(native.setFcmToken).toHaveBeenNthCalledWith(2, null);
-    });
-
-    it('forwards notification payloads', () => {
-      const payload = { aps: { alert: 'Hello' } };
-      Heracross.notifications.log(payload);
-      expect(native.logNotification).toHaveBeenCalledWith(payload);
     });
   });
 
@@ -359,9 +482,64 @@ describe('Heracross', () => {
         longitude: 151.21,
       };
       native.getLocationSpoofingState.mockResolvedValueOnce(state);
-      await expect(Heracross.location.getSpoofingState()).resolves.toEqual(
-        state
-      );
+      await expect(Heracross.location.getSpoofingState()).resolves.toEqual(state);
     });
+  });
+});
+
+describe('NativeHeracross spec', () => {
+  it("parses with React Native's codegen", () => {
+    const path = require('node:path');
+    const {
+      TypeScriptParser,
+    } = require('@react-native/codegen/lib/parsers/typescript/parser');
+    const schema = new TypeScriptParser().parseFile(
+      path.join(__dirname, '..', 'NativeHeracross.ts')
+    );
+    const module = schema.modules.NativeHeracross;
+    expect(module.type).toBe('NativeModule');
+    const methods = module.spec.methods.map((method: { name: string }) => method.name);
+    expect(methods).toEqual(
+      expect.arrayContaining([
+        'getFeatureFlags',
+        'getFeatureFlagOverride',
+        'getServers',
+        'getEnvironmentVariables',
+        'isMenuOpen',
+      ])
+    );
+    const emitters = module.spec.eventEmitters.map((emitter: { name: string }) => emitter.name);
+    expect(emitters).toEqual(['onFeatureFlagChange', 'onServerChange']);
+  });
+});
+
+describe('heracross/jest', () => {
+  function shape(value: unknown): unknown {
+    if (typeof value === 'function') {
+      return 'function';
+    }
+    if (value != null && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.keys(value)
+          .sort()
+          .map((key) => [key, shape((value as Record<string, unknown>)[key])])
+      );
+    }
+    return typeof value;
+  }
+
+  it('mocks exactly the members of the real API', () => {
+    const mock = require('../../jest');
+    const real = require('../index').Heracross;
+    expect(shape(mock.Heracross)).toEqual(shape(real));
+    expect(mock.default).toBe(mock.Heracross);
+  });
+
+  it('resolves reads and returns removable subscriptions', async () => {
+    const { createHeracrossMock } = require('../../jest');
+    const mock = createHeracrossMock();
+    await expect(mock.featureFlags.isEnabled('a')).resolves.toBe(false);
+    await expect(mock.servers.getAll()).resolves.toEqual([]);
+    expect(() => mock.servers.addListener(() => {}).remove()).not.toThrow();
   });
 });

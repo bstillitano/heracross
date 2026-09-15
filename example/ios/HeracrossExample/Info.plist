@@ -34,7 +34,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Used to scan QR codes in the Deep Link Tester</string>
+	<string>Used to scan QR codes for deep link testing</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Used to test location spoofing functionality</string>
 	<key>UILaunchStoryboardName</key>
@@ -46,6 +46,8 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>

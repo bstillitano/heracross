@@ -38,6 +38,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   // Remote notification payloads go to Scyther's Notification Logger, as in ScytherExample.
+  // Push delivery is native here, so the payload is logged natively. An app whose push
+  // library hands payloads to JavaScript can log them there with
+  // `Heracross.notifications.log(payload)` instead.
   func application(
     _ application: UIApplication,
     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
